@@ -33,6 +33,13 @@ object ProjectCodec {
             .put("walls", walls).put("openings", openings).put("furniture", furniture).put("annotations", annotations)
             .put("floorFinish", material(project.floorFinish)).put("wallFinish", material(project.wallFinish))
             .put("floorWaste", project.floorWastePercent).put("wallWaste", project.wallWastePercent)
+            .put("workRates", JSONObject()
+                .put("floorInstallation", project.workRates.floorInstallationPerM2)
+                .put("wallPreparation", project.workRates.wallPreparationPerM2)
+                .put("wallFinishing", project.workRates.wallFinishingPerM2)
+                .put("ceiling", project.workRates.ceilingPerM2)
+                .put("electrical", project.workRates.electricalPoint)
+                .put("plumbing", project.workRates.plumbingPoint))
             .put("surfaceLayout", JSONObject()
                 .put("tileWidth", project.surfaceLayout.tileWidthMm)
                 .put("tileHeight", project.surfaceLayout.tileHeightMm)
@@ -83,9 +90,18 @@ object ProjectCodec {
             layoutJson.optDouble("waste", 10.0),
             SurfacePattern.valueOf(layoutJson.optString("pattern", SurfacePattern.STRAIGHT.name))
         )
+        val ratesJson = root.optJSONObject("workRates") ?: JSONObject()
+        val rates = WorkRates(
+            ratesJson.optDouble("floorInstallation", 900.0),
+            ratesJson.optDouble("wallPreparation", 450.0),
+            ratesJson.optDouble("wallFinishing", 700.0),
+            ratesJson.optDouble("ceiling", 800.0),
+            ratesJson.optDouble("electrical", 1500.0),
+            ratesJson.optDouble("plumbing", 3000.0)
+        )
         return ProjectDocument(root.optString("id", UUID.randomUUID().toString()), root.optString("name", "Мой проект"),
             RoomPlan(walls, openings), furniture, readMaterial("floorFinish", defaultFloorMaterials.first()),
             readMaterial("wallFinish", defaultWallMaterials.first()), root.optDouble("floorWaste", 10.0),
-            root.optDouble("wallWaste", 10.0), layout, annotations)
+            root.optDouble("wallWaste", 10.0), layout, annotations, rates)
     }
 }
