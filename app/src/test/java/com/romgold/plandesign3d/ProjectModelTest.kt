@@ -1,6 +1,7 @@
 package com.romgold.plandesign3d
 
 import com.romgold.plandesign3d.domain.*
+import com.romgold.plandesign3d.data.EstimateCsvExporter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,6 +25,14 @@ class ProjectModelTest {
     @Test fun surfaceLayoutCalculatesTileCountWithWaste() {
         val layout = SurfaceLayout(tileWidthMm = 600, tileHeightMm = 600, wastePercent = 10.0)
         assertEquals(62, layout.piecesForArea(20.0))
+    }
+
+    @Test fun estimateCsvIncludesMaterialsWorkAndTotal() {
+        val project = ProjectDocument("test", "Test", RoomPlan.rectangle(5000, 4000))
+        val csv = EstimateCsvExporter.encode(project)
+        assertTrue(csv.contains("Наименование"))
+        assertTrue(csv.contains("Монтаж пола"))
+        assertTrue(csv.contains("ИТОГО"))
     }
 
     @Test fun defaultWorkRatesAreNonNegativeAndUsable() {
