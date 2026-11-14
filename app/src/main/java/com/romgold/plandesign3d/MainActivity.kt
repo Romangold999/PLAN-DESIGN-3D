@@ -396,6 +396,34 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                 Text("Выбран объект • ${selectedFurniture.kind.title}", fontWeight = FontWeight.Bold, color = Color(0xFFB7EDFF))
                 Text("${selectedFurniture.widthMm} × ${selectedFurniture.depthMm} мм • X ${selectedFurniture.xMm} • Y ${selectedFurniture.yMm} • ${selectedFurniture.rotationDegrees}°",
                     color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                var objectWidth by remember(selectedFurniture.id, selectedFurniture.widthMm) { mutableStateOf(selectedFurniture.widthMm.toString()) }
+                var objectDepth by remember(selectedFurniture.id, selectedFurniture.depthMm) { mutableStateOf(selectedFurniture.depthMm.toString()) }
+                var objectX by remember(selectedFurniture.id, selectedFurniture.xMm) { mutableStateOf(selectedFurniture.xMm.toString()) }
+                var objectY by remember(selectedFurniture.id, selectedFurniture.yMm) { mutableStateOf(selectedFurniture.yMm.toString()) }
+                Text("Точные параметры • миллиметры", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberInput("Ширина", objectWidth, { objectWidth = it }, Modifier.weight(1f))
+                    NumberInput("Глубина", objectDepth, { objectDepth = it }, Modifier.weight(1f))
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    NumberInput("X", objectX, { objectX = it }, Modifier.weight(1f))
+                    NumberInput("Y", objectY, { objectY = it }, Modifier.weight(1f))
+                }
+                Button(onClick = {
+                    val width = objectWidth.toIntOrNull()?.takeIf { it in 100..30000 } ?: return@Button
+                    val depth = objectDepth.toIntOrNull()?.takeIf { it in 100..30000 } ?: return@Button
+                    val x = objectX.toIntOrNull()?.takeIf { it >= 0 } ?: return@Button
+                    val y = objectY.toIntOrNull()?.takeIf { it >= 0 } ?: return@Button
+                    val rotated = selectedFurniture.rotationDegrees % 180 != 0
+                    val effectiveWidth = if (rotated) depth else width
+                    val effectiveDepth = if (rotated) width else depth
+                    if (x + effectiveWidth > project.room.boundsWidthMm || y + effectiveDepth > project.room.boundsDepthMm) return@Button
+                    val updated = project.furniture.map { item ->
+                        if (item.id == selectedFurniture.id) item.copy(xMm = x, yMm = y, widthMm = width, depthMm = depth) else item
+                    }
+                    change(project.copy(furniture = updated))
+                    furnitureDragOffset = Offset.Zero
+                }, modifier = Modifier.fillMaxWidth()) { Text("Применить размеры и положение") }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = {
                         val rotation = (selectedFurniture.rotationDegrees + 90) % 360
