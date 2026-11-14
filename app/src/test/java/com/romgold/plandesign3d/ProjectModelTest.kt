@@ -67,4 +67,28 @@ class ProjectModelTest {
         assertEquals(0, results.first().distanceMm)
     }
 
+    @Test fun furnitureNearWallIsReportedButDoorOpeningIsNotTreatedAsSolidWall() {
+        val room = RoomPlan.rectangle(5000, 4000)
+        val nearWall = FurnitureItem("near", FurnitureKind.TABLE, 100, 1000, 1000, 600)
+        val result = findFurnitureWallClearances(room, listOf(nearWall), 600)
+        assertEquals(1, result.size)
+        assertEquals(40, result.first().distanceMm)
+
+        val roomWithDoor = RoomPlan(
+            room.walls,
+            listOf(Opening(wallIndex = 0, offsetMm = 1000, widthMm = 900, heightMm = 2100, type = OpeningType.DOOR))
+        )
+        val inDoorway = FurnitureItem("doorway", FurnitureKind.TABLE, 1100, 0, 700, 600)
+        assertTrue(findFurnitureWallClearances(roomWithDoor, listOf(inDoorway), 600).isEmpty())
+    }
+
+    @Test fun rotatedFurnitureFootprintIsUsedForWallClearance() {
+        val room = RoomPlan.rectangle(5000, 4000)
+        val item = FurnitureItem("rotated", FurnitureKind.TABLE, 100, 1000,
+            widthMm = 1200, depthMm = 600, rotationDegrees = 90)
+        val result = findFurnitureWallClearances(room, listOf(item), 600)
+        assertEquals(1, result.size)
+        assertEquals(40, result.first().distanceMm)
+    }
+
 }
