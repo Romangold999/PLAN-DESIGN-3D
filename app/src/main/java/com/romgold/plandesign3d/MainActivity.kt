@@ -60,6 +60,9 @@ class MainActivity : ComponentActivity() {
                 var project by remember {
                     mutableStateOf(store.loadLast() ?: ProjectDocument(UUID.randomUUID().toString(), "Мой проект", RoomPlan.rectangle(5000, 4000)))
                 }
+                var tab by remember { mutableStateOf(EditorTab.PLAN) }
+                val undo = remember { mutableStateListOf<ProjectDocument>() }
+                val redo = remember { mutableStateListOf<ProjectDocument>() }
                 val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                     if (uri != null) {
                         val imported = runCatching {
@@ -73,9 +76,6 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                var tab by remember { mutableStateOf(EditorTab.PLAN) }
-                val undo = remember { mutableStateListOf<ProjectDocument>() }
-                val redo = remember { mutableStateListOf<ProjectDocument>() }
                 var saved by remember { mutableStateOf(true) }
                 var projectMenu by remember { mutableStateOf(false) }
 
