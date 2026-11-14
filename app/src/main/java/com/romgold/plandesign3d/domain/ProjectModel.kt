@@ -194,8 +194,15 @@ fun findFurnitureWallClearances(
         val o2 = orientation(ax, ay, bx, by, dx, dy)
         val o3 = orientation(cx, cy, dx, dy, ax, ay)
         val o4 = orientation(cx, cy, dx, dy, bx, by)
-        return ((o1 <= 0.0 && o2 >= 0.0) || (o1 >= 0.0 && o2 <= 0.0)) &&
-            ((o3 <= 0.0 && o4 >= 0.0) || (o3 >= 0.0 && o4 <= 0.0))
+        fun onSegment(px: Double, py: Double, qx: Double, qy: Double, rx: Double, ry: Double) =
+            qx >= minOf(px, rx) && qx <= maxOf(px, rx) &&
+                qy >= minOf(py, ry) && qy <= maxOf(py, ry)
+        if (((o1 > 0.0 && o2 < 0.0) || (o1 < 0.0 && o2 > 0.0)) &&
+            ((o3 > 0.0 && o4 < 0.0) || (o3 < 0.0 && o4 > 0.0))) return true
+        return (o1 == 0.0 && onSegment(ax, ay, cx, cy, bx, by)) ||
+            (o2 == 0.0 && onSegment(ax, ay, dx, dy, bx, by)) ||
+            (o3 == 0.0 && onSegment(cx, cy, ax, ay, dx, dy)) ||
+            (o4 == 0.0 && onSegment(cx, cy, bx, by, dx, dy))
     }
     fun segmentRectDistance(ax: Double, ay: Double, bx: Double, by: Double,
                             left: Double, top: Double, right: Double, bottom: Double): Double {
