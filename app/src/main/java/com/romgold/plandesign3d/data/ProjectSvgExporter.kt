@@ -27,6 +27,18 @@ object ProjectSvgExporter {
                 out.append("""<line x1="$x1" y1="$y1" x2="$x2" y2="$y2" stroke="$color" stroke-width="${wall.thicknessMm + 20}"/>""")
             }
         }
+        project.annotations.forEach { annotation ->
+            val color = when (annotation.kind) {
+                com.romgold.plandesign3d.domain.AnnotationKind.SOCKET -> "#2d8a57"
+                com.romgold.plandesign3d.domain.AnnotationKind.SWITCH -> "#da9a27"
+                com.romgold.plandesign3d.domain.AnnotationKind.LIGHT -> "#e8c547"
+                com.romgold.plandesign3d.domain.AnnotationKind.WATER -> "#2d9ccb"
+                com.romgold.plandesign3d.domain.AnnotationKind.DRAIN -> "#536b9b"
+                com.romgold.plandesign3d.domain.AnnotationKind.VENTILATION -> "#8b65a8"
+            }
+            out.append("""<circle cx="${annotation.xMm}" cy="${annotation.yMm}" r="70" fill="$color" stroke="#263238" stroke-width="18"/>""")
+            out.append("""<text x="${annotation.xMm + 90}" y="${annotation.yMm}" fill="#263238" stroke="none" font-size="120">${annotation.label.ifBlank { annotation.kind.title }}</text>""")
+        }
         project.furniture.forEach { item ->
             out.append("""<rect x="${item.xMm}" y="${item.yMm}" width="${item.widthMm}" height="${item.depthMm}" fill="#c18a64" stroke="#704d3a" stroke-width="20"/>""")
             out.append("""<text x="${item.xMm + item.widthMm / 2}" y="${item.yMm + item.depthMm / 2}" fill="#2f251e" stroke="none" text-anchor="middle" font-size="140">${item.kind.title}</text>""")
