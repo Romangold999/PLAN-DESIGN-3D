@@ -26,6 +26,12 @@ class ProjectModelTest {
         assertEquals(62, layout.piecesForArea(20.0))
     }
 
+    @Test fun defaultWorkRatesAreNonNegativeAndUsable() {
+        val rates = WorkRates()
+        assertEquals(900.0, rates.floorInstallationPerM2, 0.001)
+        assertEquals(1500.0, rates.electricalPoint, 0.001)
+    }
+
     @Test fun furnitureHasMillimetreDimensionsAndQuarterTurnRotation() {
         val item = FurnitureItem("bed-1", FurnitureKind.BED, 100, 200, rotationDegrees = 90)
         assertEquals(1600, item.widthMm)
