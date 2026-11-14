@@ -10,6 +10,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -215,15 +217,83 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     var pan by remember { mutableStateOf(Offset.Zero) }
     var projectName by remember(project.id, project.name) { mutableStateOf(project.name) }
     var showGeometryTools by remember { mutableStateOf(false) }
+    var selectedFurnitureId by remember(project.id) { mutableStateOf<String?>(null) }
+    var furnitureDragOffset by remember { mutableStateOf(Offset.Zero) }
     Text("План помещения", fontSize = 21.sp, fontWeight = FontWeight.Bold)
     Text("Рабочий чертёж • мм • касание двумя пальцами — масштаб и перемещение", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     Box(Modifier.fillMaxWidth().height(340.dp).background(Color(0xFF151D24), RoundedCornerShape(12.dp)).padding(8.dp)) {
-        Canvas(Modifier.fillMaxSize().pointerInput(project.room) {
-            detectTransformGestures { _, delta, zoomDelta, _ ->
-                zoom = (zoom * zoomDelta).coerceIn(0.45f, 6f)
-                pan += delta
-            }
-        }) {
+        Canvas(
+            Modifier.fillMaxSize()
+                .pointerInput(project.room) {
+                    detectTransformGestures { _, delta, zoomDelta, _ ->
+                        zoom = (zoom * zoomDelta).coerceIn(0.45f, 6f)
+                        pan += delta
+                    }
+                }
+                .pointerInput(project.room, project.furniture, zoom, pan) {
+                    detectTapGestures { tap ->
+                        val bw = project.room.boundsWidthMm.coerceAtLeast(1)
+                        val bd = project.room.boundsDepthMm.coerceAtLeast(1)
+                        val fit = min((size.width - 56f) / bw, (size.height - 56f) / bd)
+                        val scale = fit * zoom
+                        val minX = project.room.walls.minOf { min(it.start.xMm, it.end.xMm) }
+                        val minY = project.room.walls.minOf { min(it.start.yMm, it.end.yMm) }
+                        val origin = Offset((size.width - bw * scale) / 2f, (size.height - bd * scale) / 2f) + pan
+                        selectedFurnitureId = project.furniture.asReversed().firstOrNull { item ->
+                            val rotated = item.rotationDegrees % 180 != 0
+                            val w = if (rotated) item.depthMm else item.widthMm
+                            val d = if (rotated) item.widthMm else item.depthMm
+                            val left = origin.x + (item.xMm - minX) * scale
+                            val top = origin.y + (item.yMm - minY) * scale
+                            tap.x in left..(left + w * scale) && tap.y in top..(top + d * scale)
+                        }?.id
+                        furnitureDragOffset = Offset.Zero
+                    }
+                }
+                .pointerInput(project.room, project.furniture, selectedFurnitureId, zoom, pan) {
+                    detectDragGestures(
+                        onDragStart = { start ->
+                            val bw = project.room.boundsWidthMm.coerceAtLeast(1)
+                            val bd = project.room.boundsDepthMm.coerceAtLeast(1)
+                            val fit = min((size.width - 56f) / bw, (size.height - 56f) / bd)
+                            val scale = fit * zoom
+                            val minX = project.room.walls.minOf { min(it.start.xMm, it.end.xMm) }
+                            val minY = project.room.walls.minOf { min(it.start.yMm, it.end.yMm) }
+                            val origin = Offset((size.width - bw * scale) / 2f, (size.height - bd * scale) / 2f) + pan
+                            val hit = project.furniture.asReversed().firstOrNull { item ->
+                                val rotated = item.rotationDegrees % 180 != 0
+                                val w = if (rotated) item.depthMm else item.widthMm
+                                val d = if (rotated) item.widthMm else item.depthMm
+                                val left = origin.x + (item.xMm - minX) * scale
+                                val top = origin.y + (item.yMm - minY) * scale
+                                start.x in left..(left + w * scale) && start.y in top..(top + d * scale)
+                            }
+                            selectedFurnitureId = hit?.id
+                            furnitureDragOffset = Offset.Zero
+                        },
+                        onDrag = { pointerChange, amount ->
+                            if (selectedFurnitureId != null) furnitureDragOffset += amount
+                            pointerChange.consume()
+                        },
+                        onDragEnd = {
+                            val item = project.furniture.firstOrNull { it.id == selectedFurnitureId }
+                            if (item != null && furnitureDragOffset != Offset.Zero) {
+                                val bw = project.room.boundsWidthMm.coerceAtLeast(1)
+                                val bd = project.room.boundsDepthMm.coerceAtLeast(1)
+                                val fit = min((size.width - 56f) / bw, (size.height - 56f) / bd)
+                                val scale = (fit * zoom).coerceAtLeast(0.0001f)
+                                val rotated = item.rotationDegrees % 180 != 0
+                                val w = if (rotated) item.depthMm else item.widthMm
+                                val d = if (rotated) item.widthMm else item.depthMm
+                                val x = (item.xMm + furnitureDragOffset.x / scale).toInt().coerceIn(0, (bw - w).coerceAtLeast(0))
+                                val y = (item.yMm + furnitureDragOffset.y / scale).toInt().coerceIn(0, (bd - d).coerceAtLeast(0))
+                                change(project.copy(furniture = project.furniture.map { if (it.id == item.id) it.copy(xMm = x, yMm = y) else it }))
+                            }
+                            furnitureDragOffset = Offset.Zero
+                        }
+                    )
+                }
+        ) {
             val bw = project.room.boundsWidthMm.coerceAtLeast(1)
             val bd = project.room.boundsDepthMm.coerceAtLeast(1)
             val fit = min((size.width - 56f) / bw, (size.height - 56f) / bd)
@@ -282,12 +352,13 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                 val rotated = item.rotationDegrees % 180 != 0
                 val effectiveWidth = if (rotated) item.depthMm else item.widthMm
                 val effectiveDepth = if (rotated) item.widthMm else item.depthMm
-                val center = point(item.xMm + effectiveWidth / 2, item.yMm + effectiveDepth / 2)
+                val center = point(item.xMm + effectiveWidth / 2, item.yMm + effectiveDepth / 2) +
+                    if (item.id == selectedFurnitureId) furnitureDragOffset else Offset.Zero
                 val s = Size(item.widthMm * scale, item.depthMm * scale)
                 val p = Offset(center.x - s.width / 2f, center.y - s.height / 2f)
                 rotate(item.rotationDegrees.toFloat(), center) {
-                    drawRect(Color(0xFFB77B55), p, s)
-                    drawRect(Color(0xFFE0B08D), p, s, style = Stroke(2f))
+                    drawRect(if (item.id == selectedFurnitureId) Color(0xFF3C91B5) else Color(0xFFB77B55), p, s)
+                    drawRect(if (item.id == selectedFurnitureId) Color(0xFFB7EDFF) else Color(0xFFE0B08D), p, s, style = Stroke(if (item.id == selectedFurnitureId) 4f else 2f))
                 }
             }
             project.annotations.forEach { annotation ->
@@ -318,6 +389,35 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     }
     val metrics = project.room.metrics()
     Text("Площадь пола: %.2f м² • Периметр: %.2f м".format(metrics.floorAreaM2, metrics.perimeterM))
+    val selectedFurniture = project.furniture.firstOrNull { it.id == selectedFurnitureId }
+    if (selectedFurniture != null) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF20313B))) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Выбран объект • ${selectedFurniture.kind.title}", fontWeight = FontWeight.Bold, color = Color(0xFFB7EDFF))
+                Text("${selectedFurniture.widthMm} × ${selectedFurniture.depthMm} мм • X ${selectedFurniture.xMm} • Y ${selectedFurniture.yMm} • ${selectedFurniture.rotationDegrees}°",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = {
+                        val rotation = (selectedFurniture.rotationDegrees + 90) % 360
+                        val rotated = rotation % 180 != 0
+                        val w = if (rotated) selectedFurniture.depthMm else selectedFurniture.widthMm
+                        val d = if (rotated) selectedFurniture.widthMm else selectedFurniture.depthMm
+                        val x = selectedFurniture.xMm.coerceIn(0, (project.room.boundsWidthMm - w).coerceAtLeast(0))
+                        val y = selectedFurniture.yMm.coerceIn(0, (project.room.boundsDepthMm - d).coerceAtLeast(0))
+                        change(project.copy(furniture = project.furniture.map {
+                            if (it.id == selectedFurniture.id) it.copy(xMm = x, yMm = y, rotationDegrees = rotation) else it
+                        }))
+                    }, modifier = Modifier.weight(1f)) { Text("Повернуть 90°") }
+                    OutlinedButton(onClick = {
+                        change(project.copy(furniture = project.furniture.filterNot { it.id == selectedFurniture.id }))
+                        selectedFurnitureId = null
+                        furnitureDragOffset = Offset.Zero
+                    }, modifier = Modifier.weight(1f)) { Text("Удалить") }
+                }
+                Text("Перетаскивайте объект пальцем прямо на чертеже.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
     OutlinedButton(
         onClick = { showGeometryTools = !showGeometryTools },
         modifier = Modifier.fillMaxWidth()
