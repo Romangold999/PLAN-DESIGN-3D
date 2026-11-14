@@ -32,7 +32,7 @@ import java.util.UUID
 import kotlin.math.min
 
 private enum class EditorTab(val title: String) {
-    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт")
+    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
                                 EditorTab.FURNITURE -> FurnitureEditor(project, change)
                                 EditorTab.FINISHES -> FinishEditor(project, change)
                                 EditorTab.ESTIMATE -> EstimateEditor(project)
+                                EditorTab.THREE_D -> Room3DView(project, Modifier.fillMaxWidth())
                             }
                             Text(if (saved) "Автосохранение включено • офлайн" else "Есть несохранённые изменения",
                                 color = if (saved) Color(0xFF28734A) else MaterialTheme.colorScheme.primary, fontSize = 12.sp)

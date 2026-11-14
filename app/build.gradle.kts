@@ -5,13 +5,13 @@ plugins {
 }
 android {
     namespace = "com.romgold.plandesign3d"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.romgold.plandesign3d"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        targetSdk = 36
+        versionCode = 3
+        versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes { release { isMinifyEnabled = false } }
@@ -22,15 +22,16 @@ android {
     kotlinOptions { jvmTarget = "17" }
 }
 dependencies {
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+    val composeBom = platform("androidx.compose:compose-bom:2025.08.01")
     implementation(composeBom)
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("io.github.sceneview:sceneview:4.18.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
