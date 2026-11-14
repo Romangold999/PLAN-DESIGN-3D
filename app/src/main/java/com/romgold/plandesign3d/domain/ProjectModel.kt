@@ -1,6 +1,7 @@
 package com.romgold.plandesign3d.domain
 
 import kotlin.math.abs
+import kotlin.math.hypot
 import kotlin.math.sqrt
 
 enum class FurnitureKind(val title: String, val widthMm: Int, val depthMm: Int) {
@@ -222,7 +223,7 @@ fun findFurnitureWallClearances(
         return minOf(cornerDistance, pointRectDistance(ax, ay), pointRectDistance(bx, by))
     }
 
-    buildList {
+    return buildList {
         furniture.forEach { item ->
             val rotated = item.rotationDegrees % 180 != 0
             val width = if (rotated) item.depthMm else item.widthMm
