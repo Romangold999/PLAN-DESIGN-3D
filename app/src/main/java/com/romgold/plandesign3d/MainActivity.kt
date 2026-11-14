@@ -22,8 +22,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.runtime.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -226,7 +228,29 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
             val minY = project.room.walls.minOf { min(it.start.yMm, it.end.yMm) }
             val origin = Offset((size.width - bw * scale) / 2f, (size.height - bd * scale) / 2f) + pan
             fun point(x: Int, y: Int) = Offset(origin.x + (x - minX) * scale, origin.y + (y - minY) * scale)
-            drawRect(Color(project.floorFinish.colorArgb).copy(alpha = 0.45f), origin, Size(bw * scale, bd * scale))
+            val floorPath = Path().apply {
+                val first = point(project.room.walls.first().start.xMm, project.room.walls.first().start.yMm)
+                moveTo(first.x, first.y)
+                project.room.walls.forEach { wall ->
+                    val end = point(wall.end.xMm, wall.end.yMm)
+                    lineTo(end.x, end.y)
+                }
+                close()
+            }
+            drawPath(floorPath, Color(project.floorFinish.colorArgb).copy(alpha = 0.45f))
+            clipPath(floorPath) {
+                val tileWidth = project.surfaceLayout.tileWidthMm.coerceAtLeast(50)
+                val tileHeight = project.surfaceLayout.tileHeightMm.coerceAtLeast(50)
+                if (project.surfaceLayout.pattern != SurfacePattern.HERRINGBONE &&
+                    project.surfaceLayout.pattern != SurfacePattern.FRENCH_HERRINGBONE) {
+                    for (x in minX..(minX + bw) step tileWidth) {
+                        drawLine(Color(0x55315C78), point(x, minY), point(x, minY + bd), strokeWidth = 1f)
+                    }
+                    for (y in minY..(minY + bd) step tileHeight) {
+                        drawLine(Color(0x55315C78), point(minX, y), point(minX + bw, y), strokeWidth = 1f)
+                    }
+                }
+            }
             project.room.walls.forEachIndexed { index, wall ->
                 val a = point(wall.start.xMm, wall.start.yMm)
                 val b = point(wall.end.xMm, wall.end.yMm)
