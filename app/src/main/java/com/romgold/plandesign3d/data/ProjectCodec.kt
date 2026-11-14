@@ -23,10 +23,14 @@ object ProjectCodec {
                 .put("id", f.id).put("kind", f.kind.name).put("x", f.xMm).put("y", f.yMm)
                 .put("width", f.widthMm).put("depth", f.depthMm).put("rotation", f.rotationDegrees)) }
         }
+        val annotations = JSONArray().apply {
+            project.annotations.forEach { a -> put(JSONObject()
+                .put("id", a.id).put("kind", a.kind.name).put("x", a.xMm).put("y", a.yMm).put("label", a.label)) }
+        }
         fun material(m: FinishMaterial) = JSONObject().put("id", m.id).put("name", m.name)
             .put("category", m.category.name).put("color", m.colorArgb).put("price", m.pricePerSquareMetre)
         return JSONObject().put("schemaVersion", 3).put("id", project.id).put("name", project.name)
-            .put("walls", walls).put("openings", openings).put("furniture", furniture)
+            .put("walls", walls).put("openings", openings).put("furniture", furniture).put("annotations", annotations)
             .put("floorFinish", material(project.floorFinish)).put("wallFinish", material(project.wallFinish))
             .put("floorWaste", project.floorWastePercent).put("wallWaste", project.wallWastePercent)
             .put("surfaceLayout", JSONObject()
@@ -65,6 +69,13 @@ object ProjectCodec {
                 FinishCategory.valueOf(m.optString("category", fallback.category.name)),
                 m.optLong("color", fallback.colorArgb), m.optDouble("price", fallback.pricePerSquareMetre))
         }
+        val annotationsJson = root.optJSONArray("annotations") ?: JSONArray()
+        val annotations = (0 until annotationsJson.length()).map { i ->
+            val a = annotationsJson.getJSONObject(i)
+            PlanAnnotation(a.optString("id", UUID.randomUUID().toString()),
+                AnnotationKind.valueOf(a.optString("kind", AnnotationKind.SOCKET.name)),
+                a.getInt("x"), a.getInt("y"), a.optString("label", ""))
+        }
         val layoutJson = root.optJSONObject("surfaceLayout") ?: JSONObject()
         val layout = SurfaceLayout(
             layoutJson.optInt("tileWidth", 600), layoutJson.optInt("tileHeight", 600),
@@ -75,6 +86,6 @@ object ProjectCodec {
         return ProjectDocument(root.optString("id", UUID.randomUUID().toString()), root.optString("name", "Мой проект"),
             RoomPlan(walls, openings), furniture, readMaterial("floorFinish", defaultFloorMaterials.first()),
             readMaterial("wallFinish", defaultWallMaterials.first()), root.optDouble("floorWaste", 10.0),
-            root.optDouble("wallWaste", 10.0), layout)
+            root.optDouble("wallWaste", 10.0), layout, annotations)
     }
 }
