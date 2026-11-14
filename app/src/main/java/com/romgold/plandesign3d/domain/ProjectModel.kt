@@ -55,8 +55,11 @@ data class ProjectDocument(
         require(floorWastePercent in 0.0..100.0 && wallWastePercent in 0.0..100.0)
         furniture.forEach { item ->
             require(item.xMm >= 0 && item.yMm >= 0)
-            require(item.xMm + item.widthMm <= room.boundsWidthMm + 1)
-            require(item.yMm + item.depthMm <= room.boundsDepthMm + 1)
+            val rotated = item.rotationDegrees % 180 != 0
+            val effectiveWidth = if (rotated) item.depthMm else item.widthMm
+            val effectiveDepth = if (rotated) item.widthMm else item.depthMm
+            require(item.xMm + effectiveWidth <= room.boundsWidthMm + 1)
+            require(item.yMm + effectiveDepth <= room.boundsDepthMm + 1)
         }
     }
 }
