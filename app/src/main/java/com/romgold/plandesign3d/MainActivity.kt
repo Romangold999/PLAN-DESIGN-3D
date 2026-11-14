@@ -328,6 +328,27 @@ private fun FinishEditor(project: ProjectDocument, change: (ProjectDocument) -> 
     Text("Выбор влияет на цвет пола на плане и предварительный расчёт стоимости.")
     MaterialMenu("Покрытие пола", project.floorFinish, defaultFloorMaterials) { change(project.copy(floorFinish = it)) }
     MaterialMenu("Отделка стен", project.wallFinish, defaultWallMaterials) { change(project.copy(wallFinish = it)) }
+    var floorColor by remember(project.floorFinish.id) { mutableStateOf("%08X".format(project.floorFinish.colorArgb)) }
+    var wallColor by remember(project.wallFinish.id) { mutableStateOf("%08X".format(project.wallFinish.colorArgb)) }
+    var floorPrice by remember(project.floorFinish.id) { mutableStateOf(project.floorFinish.pricePerSquareMetre.toInt().toString()) }
+    var wallPrice by remember(project.wallFinish.id) { mutableStateOf(project.wallFinish.pricePerSquareMetre.toInt().toString()) }
+    Text("Собственные цвета и цены", fontWeight = FontWeight.Bold)
+    OutlinedTextField(value = floorColor, onValueChange = { floorColor = it.filter { ch -> ch.isDigit() || ch.lowercaseChar() in 'a'..'f' }.take(8) },
+        label = { Text("Цвет пола ARGB (HEX)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    NumberInput("Цена пола, ₽/м²", floorPrice, { floorPrice = it })
+    OutlinedButton(onClick = {
+        val color = floorColor.toLongOrNull(16) ?: return@OutlinedButton
+        val price = floorPrice.toDoubleOrNull()?.coerceAtLeast(0.0) ?: return@OutlinedButton
+        change(project.copy(floorFinish = project.floorFinish.copy(colorArgb = color, pricePerSquareMetre = price)))
+    }, modifier = Modifier.fillMaxWidth()) { Text("Применить цвет и цену пола") }
+    OutlinedTextField(value = wallColor, onValueChange = { wallColor = it.filter { ch -> ch.isDigit() || ch.lowercaseChar() in 'a'..'f' }.take(8) },
+        label = { Text("Цвет стен ARGB (HEX)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    NumberInput("Цена стен, ₽/м²", wallPrice, { wallPrice = it })
+    OutlinedButton(onClick = {
+        val color = wallColor.toLongOrNull(16) ?: return@OutlinedButton
+        val price = wallPrice.toDoubleOrNull()?.coerceAtLeast(0.0) ?: return@OutlinedButton
+        change(project.copy(wallFinish = project.wallFinish.copy(colorArgb = color, pricePerSquareMetre = price)))
+    }, modifier = Modifier.fillMaxWidth()) { Text("Применить цвет и цену стен") }
     NumberInput("Запас пола, %", project.floorWastePercent.toInt().toString(), change = { input ->
         input.toDoubleOrNull()?.coerceIn(0.0, 100.0)?.let { value -> change(project.copy(floorWastePercent = value)) }
     })
