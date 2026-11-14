@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -62,7 +63,17 @@ class MainActivity : ComponentActivity() {
             val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
                 if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
             }
-            MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF315C78), secondary = Color(0xFF668A78))) {
+            MaterialTheme(colorScheme = darkColorScheme(
+                primary = Color(0xFF83B8D8),
+                onPrimary = Color(0xFF10212C),
+                secondary = Color(0xFF9BC7B1),
+                background = Color(0xFF11161B),
+                surface = Color(0xFF1B2229),
+                surfaceVariant = Color(0xFF29343D),
+                onSurface = Color(0xFFE5EBEF),
+                onSurfaceVariant = Color(0xFFB4C0C8),
+                outline = Color(0xFF53616B)
+            )) {
                 var project by remember {
                     mutableStateOf(store.loadLast() ?: ProjectDocument(UUID.randomUUID().toString(), "Мой проект", RoomPlan.rectangle(5000, 4000)))
                 }
@@ -97,44 +108,76 @@ class MainActivity : ComponentActivity() {
                 }
                 LaunchedEffect(project) { store.save(project); saved = true }
 
-                Scaffold(topBar = {
-                    TopAppBar(title = {
-                        Column {
-                            Text("PLAN DESIGN 3D", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text(project.name, fontSize = 11.sp)
-                        }
-                    }, actions = {
-                        Box {
-                            TextButton(onClick = { projectMenu = true }) { Text("Проекты") }
-                            DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
-                                DropdownMenuItem(text = { Text("＋ Новый проект") }, onClick = {
-                                    project = ProjectDocument(UUID.randomUUID().toString(), "Новый проект", RoomPlan.rectangle(5000, 4000))
-                                    undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
-                                })
-                                Divider()
-                                store.list().forEach { savedProject ->
-                                    DropdownMenuItem(text = { Text(savedProject.name) }, onClick = {
-                                        project = savedProject; undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
-                                    })
+                Scaffold(
+                    containerColor = Color(0xFF11161B),
+                    topBar = {
+                        TopAppBar(
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = Color(0xFF1B2229),
+                                titleContentColor = Color(0xFFE5EBEF),
+                                actionIconContentColor = Color(0xFFB8C8D3)
+                            ),
+                            title = {
+                                Column {
+                                    Text("PLAN DESIGN 3D", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.sp)
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Box(Modifier.size(6.dp).background(if (saved) Color(0xFF69C18B) else Color(0xFFE3AE58), RoundedCornerShape(50)))
+                                        Text(project.name, fontSize = 11.sp, color = Color(0xFFB4C0C8), maxLines = 1)
+                                    }
                                 }
+                            },
+                            actions = {
+                                Box {
+                                    TextButton(onClick = { projectMenu = true }) { Text("ФАЙЛ") }
+                                    DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
+                                        DropdownMenuItem(text = { Text("＋ Новый проект") }, onClick = {
+                                            project = ProjectDocument(UUID.randomUUID().toString(), "Новый проект", RoomPlan.rectangle(5000, 4000))
+                                            undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
+                                        })
+                                        HorizontalDivider()
+                                        store.list().forEach { savedProject ->
+                                            DropdownMenuItem(text = { Text(savedProject.name) }, onClick = {
+                                                project = savedProject; undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
+                                            })
+                                        }
+                                    }
+                                }
+                                TextButton(enabled = undo.isNotEmpty(), onClick = {
+                                    if (undo.isNotEmpty()) { redo.add(project); project = undo.removeAt(undo.lastIndex); saved = false }
+                                }) { Text("↶") }
+                                TextButton(enabled = redo.isNotEmpty(), onClick = {
+                                    if (redo.isNotEmpty()) { undo.add(project); project = redo.removeAt(redo.lastIndex); saved = false }
+                                }) { Text("↷") }
+                                TextButton(onClick = { store.save(project); saved = true }) { Text("СОХР.") }
                             }
-                        }
-                        TextButton(enabled = undo.isNotEmpty(), onClick = {
-                            if (undo.isNotEmpty()) { redo.add(project); project = undo.removeAt(undo.lastIndex); saved = false }
-                        }) { Text("↶") }
-                        TextButton(enabled = redo.isNotEmpty(), onClick = {
-                            if (redo.isNotEmpty()) { undo.add(project); project = redo.removeAt(redo.lastIndex); saved = false }
-                        }) { Text("↷") }
-                        TextButton(onClick = { store.save(project); saved = true }) { Text("Сохранить") }
-                    })
-                }) { padding ->
-                    Column(Modifier.fillMaxSize().padding(padding)) {
-                        ScrollableTabRow(selectedTabIndex = tab.ordinal) {
+                        )
+                    }
+                ) { padding ->
+                    Column(Modifier.fillMaxSize().padding(padding).background(Color(0xFF11161B))) {
+                        Row(
+                            Modifier.fillMaxWidth().background(Color(0xFF202830)).horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 7.dp),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             EditorTab.values().forEach { item ->
-                                Tab(selected = tab == item, onClick = { tab = item }, text = { Text(item.title) })
+                                FilterChip(
+                                    selected = tab == item,
+                                    onClick = { tab = item },
+                                    label = { Text(item.title, fontSize = 12.sp) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Color(0xFF35566B),
+                                        selectedLabelColor = Color.White,
+                                        containerColor = Color(0xFF29343D),
+                                        labelColor = Color(0xFFCFD8DE)
+                                    )
+                                )
                             }
                         }
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(
+                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             when (tab) {
                                 EditorTab.PLAN -> PlanEditor(project, change)
                                 EditorTab.WALLS -> WallEditor(project, change)
