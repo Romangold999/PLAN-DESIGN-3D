@@ -39,7 +39,7 @@ import java.util.UUID
 import kotlin.math.min
 
 private enum class EditorTab(val title: String) {
-    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), EXPORT("Экспорт")
+    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), SURFACE("Раскладка"), ELEVATIONS("Развёртки"), EXPORT("Экспорт")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,6 +123,8 @@ class MainActivity : ComponentActivity() {
                                 EditorTab.FINISHES -> FinishEditor(project, change)
                                 EditorTab.ESTIMATE -> EstimateEditor(project)
                                 EditorTab.THREE_D -> Room3DView(project, Modifier.fillMaxWidth())
+                                EditorTab.SURFACE -> SurfaceLayoutEditor(project, change)
+                                EditorTab.ELEVATIONS -> WallElevationEditor(project)
                                 EditorTab.EXPORT -> ExportEditor(
                                     project,
                                     onSvg = { pendingExport = ProjectSvgExporter.encode(project); svgLauncher.launch(project.name + ".svg") },
@@ -432,6 +434,93 @@ private fun EstimateEditor(project: ProjectDocument) {
     Text("Не включены работы, доставка, подготовка поверхностей, расходники и инженерные системы.", fontSize = 12.sp)
 }
 
+
+
+@Composable
+private fun SurfaceLayoutEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
+    val current = project.surfaceLayout
+    var width by remember(current.tileWidthMm) { mutableStateOf(current.tileWidthMm.toString()) }
+    var height by remember(current.tileHeightMm) { mutableStateOf(current.tileHeightMm.toString()) }
+    var grout by remember(current.groutMm) { mutableStateOf(current.groutMm.toString()) }
+    var waste by remember(current.wastePercent) { mutableStateOf(current.wastePercent.toInt().toString()) }
+    var pattern by remember(current.pattern) { mutableStateOf(current.pattern) }
+    Text("Раскладка плитки и покрытий", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Настройте формат элемента, ширину шва, направление и запас. Количество считается по площади.")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("Ширина, мм", width, { width = it }, Modifier.weight(1f))
+        NumberInput("Длина, мм", height, { height = it }, Modifier.weight(1f))
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("Шов, мм", grout, { grout = it }, Modifier.weight(1f))
+        NumberInput("Запас, %", waste, { waste = it }, Modifier.weight(1f))
+    }
+    Text("Схема раскладки", fontWeight = FontWeight.SemiBold)
+    SurfacePattern.values().forEach { option ->
+        FilterChip(selected = pattern == option, onClick = { pattern = option }, label = { Text(option.title) })
+    }
+    Button(onClick = {
+        val w = width.toIntOrNull() ?: return@Button
+        val h = height.toIntOrNull() ?: return@Button
+        val g = grout.toIntOrNull() ?: return@Button
+        val wasteValue = waste.toDoubleOrNull() ?: return@Button
+        val layout = runCatching { SurfaceLayout(w, h, g, current.rotationDegrees, wasteValue, pattern) }.getOrNull() ?: return@Button
+        change(project.copy(surfaceLayout = layout))
+    }, modifier = Modifier.fillMaxWidth()) { Text("Применить раскладку") }
+    val metrics = project.room.metrics()
+    val floorPieces = current.piecesForArea(metrics.floorAreaM2)
+    val wallPieces = current.piecesForArea(metrics.netWallAreaM2)
+    EstimateLine("Площадь пола", "%.2f м²".format(metrics.floorAreaM2))
+    EstimateLine("Элементов на пол с запасом", floorPieces.toString() + " шт.")
+    EstimateLine("Площадь стен", "%.2f м²".format(metrics.netWallAreaM2))
+    EstimateLine("Элементов на стены с запасом", wallPieces.toString() + " шт.")
+    Text("Расчёт количества ориентировочный: подрезка, рисунок и реальные размеры помещения могут изменить итог.")
+}
+
+@Composable
+private fun WallElevationEditor(project: ProjectDocument) {
+    var wallIndex by remember { mutableIntStateOf(0) }
+    var menu by remember { mutableStateOf(false) }
+    val wall = project.room.walls[wallIndex.coerceIn(project.room.walls.indices)]
+    val openings = project.room.openings.filter { it.wallIndex == wallIndex }
+    Text("Развёртки стен", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Фасад выбранной стены с точными проёмами и высотными отметками.")
+    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
+        OutlinedTextField(value = "Стена " + (wallIndex + 1), onValueChange = {}, readOnly = true,
+            label = { Text("Выбрать стену") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) },
+            modifier = Modifier.menuAnchor().fillMaxWidth())
+        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            project.room.walls.forEachIndexed { index, item ->
+                DropdownMenuItem(text = { Text("Стена " + (index + 1) + " • " + item.lengthMm.toInt() + " мм") },
+                    onClick = { wallIndex = index; menu = false })
+            }
+        }
+    }
+    Canvas(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFFF0F2F2), RoundedCornerShape(12.dp)).padding(12.dp)) {
+        val scale = min((size.width - 32f) / wall.lengthMm.toFloat(), (size.height - 32f) / wall.heightMm.toFloat())
+        val wallWidth = wall.lengthMm.toFloat() * scale
+        val wallHeight = wall.heightMm * scale
+        val left = (size.width - wallWidth) / 2f
+        val top = (size.height - wallHeight) / 2f
+        drawRect(Color(project.wallFinish.colorArgb), Offset(left, top), Size(wallWidth, wallHeight))
+        drawRect(Color(0xFF315C78), Offset(left, top), Size(wallWidth, wallHeight), style = Stroke(3f))
+        openings.forEach { opening ->
+            val x = left + opening.offsetMm * scale
+            val h = opening.heightMm * scale
+            val y = top + (wall.heightMm - opening.sillHeightMm - opening.heightMm) * scale
+            val color = if (opening.type == OpeningType.WINDOW) Color(0xFF77C8DE) else Color(0xFFF0F2F2)
+            drawRect(color, Offset(x, y), Size(opening.widthMm * scale, h))
+            drawRect(Color(0xFF315C78), Offset(x, y), Size(opening.widthMm * scale, h), style = Stroke(2f))
+        }
+    }
+    EstimateLine("Длина стены", wall.lengthMm.toInt().toString() + " мм")
+    EstimateLine("Высота стены", wall.heightMm.toString() + " мм")
+    EstimateLine("Толщина", wall.thicknessMm.toString() + " мм")
+    EstimateLine("Проёмов", openings.size.toString())
+    openings.forEachIndexed { index, opening ->
+        Text((index + 1).toString() + ". " + (if (opening.type == OpeningType.DOOR) "Дверь" else "Окно") +
+            " • отступ " + opening.offsetMm + " мм • " + opening.widthMm + "×" + opening.heightMm + " мм")
+    }
+}
 
 @Composable
 private fun ExportEditor(project: ProjectDocument, onSvg: () -> Unit, onJson: () -> Unit) {
