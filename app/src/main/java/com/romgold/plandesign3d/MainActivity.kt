@@ -435,6 +435,32 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
             }
         }
     }
+    val wallClearances = remember(project.room, project.furniture) {
+        findFurnitureWallClearances(project.room, project.furniture, minimumClearanceMm = 600)
+    }
+    if (wallClearances.isNotEmpty()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A3423))) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Мебель близко к стенам: ${wallClearances.size}",
+                    color = Color(0xFFFFD58A), fontWeight = FontWeight.Bold)
+                wallClearances.take(4).forEach { clearance ->
+                    val description = if (clearance.distanceMm < 0) {
+                        "пересечение стены"
+                    } else {
+                        "${clearance.distanceMm} мм до стены"
+                    }
+                    Text("${clearance.furniture.kind.title} • стена ${clearance.wallIndex + 1}: $description",
+                        color = Color(0xFFFFE8BE), fontSize = 12.sp)
+                }
+                if (wallClearances.size > 4) {
+                    Text("И ещё ${wallClearances.size - 4} объектов",
+                        color = Color(0xFFFFE8BE), fontSize = 12.sp)
+                }
+                Text("Расчёт учитывает толщину стены и дверные проёмы; это предварительная проверка по контуру помещения.",
+                    color = Color(0xFFD8C9A9), fontSize = 11.sp)
+            }
+        }
+    }
     val selectedFurniture = project.furniture.firstOrNull { it.id == selectedFurnitureId }
     if (selectedFurniture != null) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF20313B))) {
