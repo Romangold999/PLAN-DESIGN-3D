@@ -2,7 +2,7 @@
 
 Android room-planning and interior-layout editor built with Kotlin, Jetpack Compose and SceneView/Filament.
 
-## Current implementation (0.4.1)
+## Current implementation (0.4.2)
 
 - Room geometry in integer millimetres; rectangular and coordinate-defined polygon rooms.
 - Closed-contour, self-intersection and opening-overlap validation.
