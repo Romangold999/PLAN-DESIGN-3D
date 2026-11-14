@@ -9,7 +9,7 @@ Android room-planning and interior-layout editor built with Kotlin, Jetpack Comp
 - 2D plan with pinch zoom, pan, true polygon floor fill and surface grid.
 - Doors and windows with offsets, widths, heights and sill levels.
 - Per-wall thickness and height settings.
-- Procedural 3D room preview with openings, furniture, selected floor/wall colours, room-aware camera framing and front/side/top/isometric view presets.
+- Procedural 3D room preview with openings, furniture, selected floor/wall colours, room-aware camera framing, front/side/top/isometric presets, and 360° yaw plus near-full vertical camera orbit sliders.
 - Furniture and sanitary fixtures: add, move by coordinates, rotate in 90-degree steps and remove.
 - Finish catalogue, editable ARGB colours and editable material prices.
 - Surface layout parameters: tile format, grout, pattern and waste; approximate piece count.
