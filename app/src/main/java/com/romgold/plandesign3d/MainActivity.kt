@@ -414,6 +414,27 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
             }
         }
     }
+    val narrowPassages = remember(project.furniture) {
+        findNarrowFurniturePassages(project.furniture, minimumClearanceMm = 600)
+    }
+    if (narrowPassages.isNotEmpty()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A3423))) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Узкие проходы между предметами: ${narrowPassages.size}",
+                    color = Color(0xFFFFD58A), fontWeight = FontWeight.Bold)
+                narrowPassages.take(4).forEach { passage ->
+                    Text("${passage.first.kind.title} ↔ ${passage.second.kind.title}: ${passage.distanceMm} мм",
+                        color = Color(0xFFFFE8BE), fontSize = 12.sp)
+                }
+                if (narrowPassages.size > 4) {
+                    Text("И ещё ${narrowPassages.size - 4} узких проходов",
+                        color = Color(0xFFFFE8BE), fontSize = 12.sp)
+                }
+                Text("Ориентир для свободного прохода — не менее 600 мм. Проверьте фактическую планировку.",
+                    color = Color(0xFFD8C9A9), fontSize = 11.sp)
+            }
+        }
+    }
     val selectedFurniture = project.furniture.firstOrNull { it.id == selectedFurnitureId }
     if (selectedFurniture != null) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF20313B))) {
