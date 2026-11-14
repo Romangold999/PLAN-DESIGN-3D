@@ -263,12 +263,12 @@ private fun FinishEditor(project: ProjectDocument, change: (ProjectDocument) -> 
     Text("Выбор влияет на цвет пола на плане и предварительный расчёт стоимости.")
     MaterialMenu("Покрытие пола", project.floorFinish, defaultFloorMaterials) { change(project.copy(floorFinish = it)) }
     MaterialMenu("Отделка стен", project.wallFinish, defaultWallMaterials) { change(project.copy(wallFinish = it)) }
-    NumberInput("Запас пола, %", project.floorWastePercent.toInt().toString()) {
-        it.toDoubleOrNull()?.coerceIn(0.0, 100.0)?.let { value -> change(project.copy(floorWastePercent = value)) }
-    }
-    NumberInput("Запас стен, %", project.wallWastePercent.toInt().toString()) {
-        it.toDoubleOrNull()?.coerceIn(0.0, 100.0)?.let { value -> change(project.copy(wallWastePercent = value)) }
-    }
+    NumberInput("Запас пола, %", project.floorWastePercent.toInt().toString(), change = { input ->
+        input.toDoubleOrNull()?.coerceIn(0.0, 100.0)?.let { value -> change(project.copy(floorWastePercent = value)) }
+    })
+    NumberInput("Запас стен, %", project.wallWastePercent.toInt().toString(), change = { input ->
+        input.toDoubleOrNull()?.coerceIn(0.0, 100.0)?.let { value -> change(project.copy(wallWastePercent = value)) }
+    })
 }
 
 @Composable
