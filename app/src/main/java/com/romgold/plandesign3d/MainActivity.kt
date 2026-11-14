@@ -60,6 +60,19 @@ class MainActivity : ComponentActivity() {
                 var project by remember {
                     mutableStateOf(store.loadLast() ?: ProjectDocument(UUID.randomUUID().toString(), "Мой проект", RoomPlan.rectangle(5000, 4000)))
                 }
+                val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                    if (uri != null) {
+                        val imported = runCatching {
+                            context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { ProjectCodec.decode(it.readText()) }
+                        }.getOrNull()
+                        if (imported != null) {
+                            project = imported
+                            undo.clear()
+                            redo.clear()
+                            tab = EditorTab.PLAN
+                        }
+                    }
+                }
                 var tab by remember { mutableStateOf(EditorTab.PLAN) }
                 val undo = remember { mutableStateListOf<ProjectDocument>() }
                 val redo = remember { mutableStateListOf<ProjectDocument>() }
@@ -128,7 +141,8 @@ class MainActivity : ComponentActivity() {
                                 EditorTab.EXPORT -> ExportEditor(
                                     project,
                                     onSvg = { pendingExport = ProjectSvgExporter.encode(project); svgLauncher.launch(project.name + ".svg") },
-                                    onJson = { pendingExport = ProjectCodec.encode(project); jsonLauncher.launch(project.name + ".json") }
+                                    onJson = { pendingExport = ProjectCodec.encode(project); jsonLauncher.launch(project.name + ".json") },
+                                    onImport = { importLauncher.launch(arrayOf("application/json", "text/plain")) }
                                 )
                             }
                             Text(if (saved) "Автосохранение включено • офлайн" else "Есть несохранённые изменения",
@@ -528,12 +542,13 @@ private fun WallElevationEditor(project: ProjectDocument) {
 }
 
 @Composable
-private fun ExportEditor(project: ProjectDocument, onSvg: () -> Unit, onJson: () -> Unit) {
+private fun ExportEditor(project: ProjectDocument, onSvg: () -> Unit, onJson: () -> Unit, onImport: () -> Unit) {
     Text("Экспорт проекта", fontSize = 21.sp, fontWeight = FontWeight.Bold)
     Text("SVG содержит план помещения, стены, проёмы и мебель. JSON сохраняет редактируемую модель проекта для повторного открытия и будущего импорта.")
     Button(onClick = onSvg, modifier = Modifier.fillMaxWidth()) { Text("Сохранить чертёж SVG") }
     OutlinedButton(onClick = onJson, modifier = Modifier.fillMaxWidth()) { Text("Сохранить проект JSON") }
-    Text("Экспорт выполняется через системный диалог сохранения Android.")
+    OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) { Text("Импортировать проект JSON") }
+    Text("SVG — чертёж для просмотра и печати. JSON — полный редактируемый проект, который можно импортировать обратно.")
 }
 
 @Composable
