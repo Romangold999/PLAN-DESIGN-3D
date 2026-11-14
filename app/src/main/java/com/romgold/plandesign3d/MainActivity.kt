@@ -250,7 +250,7 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                         furnitureDragOffset = Offset.Zero
                     }
                 }
-                .pointerInput(project.room, project.furniture, selectedFurnitureId, zoom, pan) {
+                .pointerInput(project.room, project.furniture, zoom, pan) {
                     detectDragGestures(
                         onDragStart = { start ->
                             val bw = project.room.boundsWidthMm.coerceAtLeast(1)
