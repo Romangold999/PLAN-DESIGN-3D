@@ -305,9 +305,16 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
             }
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { zoom = 1f; pan = Offset.Zero }) { Text("Сбросить вид") }
-        Text(project.room.boundsWidthMm.toString() + " × " + project.room.boundsDepthMm + " мм", fontWeight = FontWeight.SemiBold)
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        OutlinedButton(onClick = { zoom = (zoom / 1.25f).coerceAtLeast(0.45f) }, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("−") }
+        Text("${(zoom * 100).toInt()}%", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+        OutlinedButton(onClick = { zoom = (zoom * 1.25f).coerceAtMost(6f) }, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("+") }
+        OutlinedButton(onClick = { zoom = 1f; pan = Offset.Zero }, contentPadding = PaddingValues(horizontal = 10.dp)) { Text("Сбросить") }
+        Text(project.room.boundsWidthMm.toString() + " × " + project.room.boundsDepthMm + " мм", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
     }
     val metrics = project.room.metrics()
     Text("Площадь пола: %.2f м² • Периметр: %.2f м".format(metrics.floorAreaM2, metrics.perimeterM))
