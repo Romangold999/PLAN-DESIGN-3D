@@ -50,7 +50,8 @@ data class ProjectDocument(
     val floorWastePercent: Double = 10.0,
     val wallWastePercent: Double = 10.0,
     val surfaceLayout: SurfaceLayout = SurfaceLayout(),
-    val annotations: List<PlanAnnotation> = emptyList()
+    val annotations: List<PlanAnnotation> = emptyList(),
+    val workRates: WorkRates = WorkRates()
 ) {
     init {
         require(name.isNotBlank())
