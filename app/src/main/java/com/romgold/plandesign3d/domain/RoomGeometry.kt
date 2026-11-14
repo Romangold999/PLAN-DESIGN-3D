@@ -45,6 +45,8 @@ data class RoomPlan(
     val walls: List<WallSegment>,
     val openings: List<Opening> = emptyList()
 ) {
+    val boundsWidthMm: Int get() = walls.maxOf { maxOf(it.start.xMm, it.end.xMm) } - walls.minOf { minOf(it.start.xMm, it.end.xMm) }
+    val boundsDepthMm: Int get() = walls.maxOf { maxOf(it.start.yMm, it.end.yMm) } - walls.minOf { minOf(it.start.yMm, it.end.yMm) }
     init {
         require(walls.size >= 3) { "A room needs at least three walls" }
         require(walls.indices.all { index ->
