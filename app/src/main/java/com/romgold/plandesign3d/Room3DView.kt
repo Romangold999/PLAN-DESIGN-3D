@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import io.github.sceneview.SceneView
 import io.github.sceneview.rememberCameraManipulator
@@ -69,9 +70,19 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
             engine = engine,
             cameraManipulator = rememberCameraManipulator()
         ) {
+            val floorMaterial = remember(materialLoader, project.floorFinish.colorArgb) {
+                materialLoader.createColorInstance(Color(project.floorFinish.colorArgb), metallic = 0f, roughness = 0.85f)
+            }
+            val wallMaterial = remember(materialLoader, project.wallFinish.colorArgb) {
+                materialLoader.createColorInstance(Color(project.wallFinish.colorArgb), metallic = 0f, roughness = 0.9f)
+            }
+            val furnitureMaterial = remember(materialLoader) {
+                materialLoader.createColorInstance(Color(0xFFC18A64), metallic = 0f, roughness = 0.75f)
+            }
             CubeNode(
                 size = SceneSize(project.room.boundsWidthMm / 1000f, 0.025f, project.room.boundsDepthMm / 1000f),
-                position = Position(0f, -0.0125f, 0f)
+                position = Position(0f, -0.0125f, 0f),
+                materialInstance = floorMaterial
             )
             pieces.forEach { piece ->
                 val wall = project.room.walls[piece.wallIndex]
@@ -88,7 +99,8 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
                     CubeNode(
                         size = SceneSize((piece.toMm - piece.fromMm) / 1000f, height, wall.thicknessMm / 1000f),
                         position = Position(worldX, (piece.bottomMm + piece.topMm) / 2000f, worldZ),
-                        rotation = Rotation(y = -atan2(uz, ux))
+                        rotation = Rotation(y = -atan2(uz, ux)),
+                        materialInstance = wallMaterial
                     )
                 }
             }
@@ -100,7 +112,8 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
                         0.325f,
                         (item.yMm + item.depthMm / 2f - centerZ) / 1000f
                     ),
-                    rotation = Rotation(y = Math.toRadians(item.rotationDegrees.toDouble()).toFloat())
+                    rotation = Rotation(y = Math.toRadians(item.rotationDegrees.toDouble()).toFloat()),
+                    materialInstance = furnitureMaterial
                 )
             }
         }
