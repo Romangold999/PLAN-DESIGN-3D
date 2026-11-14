@@ -256,7 +256,7 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
         change(project.copy(room = shape, furniture = emptyList()))
     }, enabled = vertices.size >= 3, modifier = Modifier.fillMaxWidth()) { Text("Построить помещение по контуру") }
 
-    Box(Modifier.fillMaxWidth().height(300.dp).background(Color(0xFFF0F2F2), RoundedCornerShape(16.dp)).padding(8.dp)) {
+    Box(Modifier.fillMaxWidth().height(340.dp).background(Color(0xFF151D24), RoundedCornerShape(12.dp)).padding(8.dp)) {
         Canvas(Modifier.fillMaxSize().pointerInput(project.room) {
             detectTransformGestures { _, delta, zoomDelta, _ ->
                 zoom = (zoom * zoomDelta).coerceIn(0.45f, 6f)
@@ -271,6 +271,14 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
             val minY = project.room.walls.minOf { min(it.start.yMm, it.end.yMm) }
             val origin = Offset((size.width - bw * scale) / 2f, (size.height - bd * scale) / 2f) + pan
             fun point(x: Int, y: Int) = Offset(origin.x + (x - minX) * scale, origin.y + (y - minY) * scale)
+            for (x in minX..(minX + bw) step 500) {
+                val major = (x % 1000 == 0)
+                drawLine(if (major) Color(0xFF344653) else Color(0xFF26343E), point(x, minY), point(x, minY + bd), strokeWidth = if (major) 1.2f else 0.6f)
+            }
+            for (y in minY..(minY + bd) step 500) {
+                val major = (y % 1000 == 0)
+                drawLine(if (major) Color(0xFF344653) else Color(0xFF26343E), point(minX, y), point(minX + bw, y), strokeWidth = if (major) 1.2f else 0.6f)
+            }
             val floorPath = Path().apply {
                 val first = point(project.room.walls.first().start.xMm, project.room.walls.first().start.yMm)
                 moveTo(first.x, first.y)
@@ -298,14 +306,14 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                 val a = point(wall.start.xMm, wall.start.yMm)
                 val b = point(wall.end.xMm, wall.end.yMm)
                 val stroke = (wall.thicknessMm * scale).coerceAtLeast(5f)
-                drawLine(Color(0xFF315C78), a, b, strokeWidth = stroke)
+                drawLine(Color(0xFF8FB8D0), a, b, strokeWidth = stroke)
                 project.room.openings.filter { it.wallIndex == index }.forEach { opening ->
                     val length = wall.lengthMm.toFloat()
                     val from = opening.offsetMm / length
                     val to = (opening.offsetMm + opening.widthMm) / length
                     val p1 = Offset(a.x + (b.x - a.x) * from, a.y + (b.y - a.y) * from)
                     val p2 = Offset(a.x + (b.x - a.x) * to, a.y + (b.y - a.y) * to)
-                    drawLine(Color(0xFFF0F2F2), p1, p2, strokeWidth = stroke + 3f)
+                    drawLine(Color(0xFF151D24), p1, p2, strokeWidth = stroke + 3f)
                     if (opening.type == OpeningType.WINDOW) drawLine(Color(0xFF38A6C8), p1, p2, strokeWidth = 3f)
                 }
             }
@@ -318,7 +326,7 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                 val p = Offset(center.x - s.width / 2f, center.y - s.height / 2f)
                 rotate(item.rotationDegrees.toFloat(), center) {
                     drawRect(Color(0xFFB77B55), p, s)
-                    drawRect(Color(0xFF704D3A), p, s, style = Stroke(2f))
+                    drawRect(Color(0xFFE0B08D), p, s, style = Stroke(2f))
                 }
             }
             project.annotations.forEach { annotation ->
@@ -671,21 +679,21 @@ private fun WallElevationEditor(project: ProjectDocument) {
             }
         }
     }
-    Canvas(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFFF0F2F2), RoundedCornerShape(12.dp)).padding(12.dp)) {
+    Canvas(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFF151D24), RoundedCornerShape(12.dp)).padding(12.dp)) {
         val scale = min((size.width - 32f) / wall.lengthMm.toFloat(), (size.height - 32f) / wall.heightMm.toFloat())
         val wallWidth = wall.lengthMm.toFloat() * scale
         val wallHeight = wall.heightMm * scale
         val left = (size.width - wallWidth) / 2f
         val top = (size.height - wallHeight) / 2f
         drawRect(Color(project.wallFinish.colorArgb), Offset(left, top), Size(wallWidth, wallHeight))
-        drawRect(Color(0xFF315C78), Offset(left, top), Size(wallWidth, wallHeight), style = Stroke(3f))
+        drawRect(Color(0xFF8FB8D0), Offset(left, top), Size(wallWidth, wallHeight), style = Stroke(3f))
         openings.forEach { opening ->
             val x = left + opening.offsetMm * scale
             val h = opening.heightMm * scale
             val y = top + (wall.heightMm - opening.sillHeightMm - opening.heightMm) * scale
             val color = if (opening.type == OpeningType.WINDOW) Color(0xFF77C8DE) else Color(0xFFF0F2F2)
             drawRect(color, Offset(x, y), Size(opening.widthMm * scale, h))
-            drawRect(Color(0xFF315C78), Offset(x, y), Size(opening.widthMm * scale, h), style = Stroke(2f))
+            drawRect(Color(0xFF8FB8D0), Offset(x, y), Size(opening.widthMm * scale, h), style = Stroke(2f))
         }
     }
     EstimateLine("Длина", wall.lengthMm.toInt().toString() + " мм")
