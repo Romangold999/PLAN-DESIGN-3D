@@ -1,22 +1,30 @@
 # PLAN DESIGN 3D
 
-Independent Android room-planning and interior-design application. Not part of PLAN MASTER 3D.
+Android room-planning and interior-layout editor. Kotlin, Jetpack Compose and SceneView/Filament.
 
-## Current milestone
-Android foundation, touch-first 2D room prototype, millimetre dimensions, local save, and CI APK build. 3D is not claimed complete; SceneView/Filament compatibility will be tested before integration.
+## Current implementation (0.4.0)
+
+- Room geometry in integer millimetres; rectangular and coordinate-defined polygon rooms.
+- Closed-contour, self-intersection and opening-overlap validation.
+- 2D plan with pinch zoom and pan.
+- Doors and windows with offsets, widths, heights and sill levels.
+- Procedural 3D room preview with openings, furniture, selected floor/wall colours and orbit camera controls.
+- Furniture and sanitary fixtures: add, move by coordinates, rotate in 90-degree steps and remove.
+- Finish catalogue, editable ARGB colours and editable material prices.
+- Surface layout parameters: tile format, grout, pattern and waste; approximate piece count.
+- Wall elevations showing openings.
+- Engineering plan points for sockets, switches, lights, water, drainage and ventilation.
+- Preliminary floor/wall material quantity and cost estimate.
+- Multiple local projects, autosave, undo/redo.
+- JSON project import/export and SVG plan export.
+- Offline-first storage; no account or paid API required.
 
 ## Build
-JDK 17 and Android SDK 35:
-`gradle :app:assembleDebug`
 
-GitHub Actions builds a debug APK and uploads it as an artifact.
+Open with Android Studio (JDK 17, Android SDK 36, Gradle 8.13, Kotlin 2.2.20) or use the GitHub Actions workflow.
 
-## Device target
-Android 14 / ARM64 (Unihertz Tank 2), touch-first and offline-first.
+The CI workflow runs `:app:assembleDebug`, `:app:testDebugUnitTest` and publishes a debug APK artifact.
 
-## Roadmap
-1. Android foundation and installable APK.
-2. Geometry core, walls, openings, validation and tests.
-3. 2D editor: numeric dimensions, pan/zoom, snapping, undo/redo.
-4. 3D scene from shared geometry, full orbit camera.
-5. Versioned local projects, export and device validation.
+## Current limitations / next milestones
+
+This is an actively developed MVP, not yet a full professional CAD/BIM package. Detailed arbitrary wall editing, wall thickness/height per segment, niches and recesses, texture-image materials, lighting controls, ceiling plans, electrical circuit routing, plumbing pipe routing, collision detection, labour-rate estimates, PDF/print sheets and DWG/DXF exchange still need dedicated implementation and device validation. Tile counts are area-based estimates and do not yet simulate every cut or pattern boundary.
