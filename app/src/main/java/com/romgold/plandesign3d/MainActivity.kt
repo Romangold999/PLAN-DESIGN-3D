@@ -40,7 +40,7 @@ import java.util.UUID
 import kotlin.math.min
 
 private enum class EditorTab(val title: String) {
-    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), SURFACE("Раскладка"), ELEVATIONS("Развёртки"), ENGINEERING("Инженерия"), EXPORT("Экспорт")
+    PLAN("План"), WALLS("Стены"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), SURFACE("Раскладка"), ELEVATIONS("Развёртки"), ENGINEERING("Инженерия"), EXPORT("Экспорт")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -135,6 +135,7 @@ class MainActivity : ComponentActivity() {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             when (tab) {
                                 EditorTab.PLAN -> PlanEditor(project, change)
+                                EditorTab.WALLS -> WallEditor(project, change)
                                 EditorTab.OPENINGS -> OpeningEditor(project, change)
                                 EditorTab.FURNITURE -> FurnitureEditor(project, change)
                                 EditorTab.FINISHES -> FinishEditor(project, change)
@@ -274,6 +275,36 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     }
     val metrics = project.room.metrics()
     Text("Площадь пола: %.2f м² • Периметр: %.2f м".format(metrics.floorAreaM2, metrics.perimeterM))
+}
+
+
+@Composable
+private fun WallEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
+    Text("Конструкция стен", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Толщина и высота задаются отдельно для каждой стены. Длина определяется геометрией контура.")
+    project.room.walls.forEachIndexed { index, wall ->
+        key(index) {
+            var thickness by remember(index, wall.thicknessMm) { mutableStateOf(wall.thicknessMm.toString()) }
+            var height by remember(index, wall.heightMm) { mutableStateOf(wall.heightMm.toString()) }
+            Card {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Стена " + (index + 1) + " • длина " + wall.lengthMm.toInt() + " мм", fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberInput("Толщина, мм", thickness, { thickness = it }, Modifier.weight(1f))
+                        NumberInput("Высота, мм", height, { height = it }, Modifier.weight(1f))
+                    }
+                    OutlinedButton(onClick = {
+                        val t = thickness.toIntOrNull() ?: return@OutlinedButton
+                        val h = height.toIntOrNull() ?: return@OutlinedButton
+                        val walls = project.room.walls.toMutableList()
+                        walls[index] = wall.copy(thicknessMm = t, heightMm = h)
+                        val room = runCatching { RoomPlan(walls, project.room.openings) }.getOrNull() ?: return@OutlinedButton
+                        change(project.copy(room = room))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Применить к стене " + (index + 1)) }
+                }
+            }
+        }
+    }
 }
 
 @Composable
