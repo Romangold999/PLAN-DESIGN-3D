@@ -546,6 +546,137 @@ private fun EstimateEditor(project: ProjectDocument, change: (ProjectDocument) -
     Text("Оценка не является договорной сметой. Не включены доставка, демонтаж, расходники, налоги и непредусмотренные работы.", fontSize = 12.sp)
 }
 
+
+@Composable
+private fun SurfaceLayoutEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
+    val current = project.surfaceLayout
+    var width by remember(current.tileWidthMm) { mutableStateOf(current.tileWidthMm.toString()) }
+    var height by remember(current.tileHeightMm) { mutableStateOf(current.tileHeightMm.toString()) }
+    var grout by remember(current.groutMm) { mutableStateOf(current.groutMm.toString()) }
+    var waste by remember(current.wastePercent) { mutableStateOf(current.wastePercent.toInt().toString()) }
+    var pattern by remember(current.pattern) { mutableStateOf(current.pattern) }
+    Text("Раскладка плитки и покрытий", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Формат элемента, ширина шва, схема и запас. Количество рассчитывается по площади.")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("Ширина, мм", width, { width = it }, Modifier.weight(1f))
+        NumberInput("Длина, мм", height, { height = it }, Modifier.weight(1f))
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("Шов, мм", grout, { grout = it }, Modifier.weight(1f))
+        NumberInput("Запас, %", waste, { waste = it }, Modifier.weight(1f))
+    }
+    Text("Схема раскладки", fontWeight = FontWeight.SemiBold)
+    SurfacePattern.values().forEach { option ->
+        FilterChip(selected = pattern == option, onClick = { pattern = option }, label = { Text(option.title) })
+    }
+    Button(onClick = {
+        val w = width.toIntOrNull() ?: return@Button
+        val h = height.toIntOrNull() ?: return@Button
+        val g = grout.toIntOrNull() ?: return@Button
+        val wasteValue = waste.toDoubleOrNull() ?: return@Button
+        val layout = runCatching { SurfaceLayout(w, h, g, current.rotationDegrees, wasteValue, pattern) }.getOrNull() ?: return@Button
+        change(project.copy(surfaceLayout = layout))
+    }, modifier = Modifier.fillMaxWidth()) { Text("Применить раскладку") }
+    val metrics = project.room.metrics()
+    EstimateLine("Площадь пола", "%.2f м²".format(metrics.floorAreaM2))
+    EstimateLine("Элементов на пол с запасом", current.piecesForArea(metrics.floorAreaM2).toString() + " шт.")
+    EstimateLine("Площадь стен", "%.2f м²".format(metrics.netWallAreaM2))
+    EstimateLine("Элементов на стены с запасом", current.piecesForArea(metrics.netWallAreaM2).toString() + " шт.")
+    Text("Ориентировочное количество: точная подрезка зависит от раскладки и фактических размеров.")
+}
+
+@Composable
+private fun WallElevationEditor(project: ProjectDocument) {
+    var wallIndex by remember { mutableIntStateOf(0) }
+    var menu by remember { mutableStateOf(false) }
+    val wall = project.room.walls[wallIndex.coerceIn(project.room.walls.indices)]
+    val openings = project.room.openings.filter { it.wallIndex == wallIndex }
+    Text("Развёртки стен", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Фасад выбранной стены с дверями и окнами.")
+    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
+        OutlinedTextField(value = "Стена " + (wallIndex + 1), onValueChange = {}, readOnly = true,
+            label = { Text("Выбрать стену") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) },
+            modifier = Modifier.menuAnchor().fillMaxWidth())
+        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            project.room.walls.forEachIndexed { index, item ->
+                DropdownMenuItem(text = { Text("Стена " + (index + 1) + " • " + item.lengthMm.toInt() + " мм") },
+                    onClick = { wallIndex = index; menu = false })
+            }
+        }
+    }
+    Canvas(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFFF0F2F2), RoundedCornerShape(12.dp)).padding(12.dp)) {
+        val scale = min((size.width - 32f) / wall.lengthMm.toFloat(), (size.height - 32f) / wall.heightMm.toFloat())
+        val wallWidth = wall.lengthMm.toFloat() * scale
+        val wallHeight = wall.heightMm * scale
+        val left = (size.width - wallWidth) / 2f
+        val top = (size.height - wallHeight) / 2f
+        drawRect(Color(project.wallFinish.colorArgb), Offset(left, top), Size(wallWidth, wallHeight))
+        drawRect(Color(0xFF315C78), Offset(left, top), Size(wallWidth, wallHeight), style = Stroke(3f))
+        openings.forEach { opening ->
+            val x = left + opening.offsetMm * scale
+            val h = opening.heightMm * scale
+            val y = top + (wall.heightMm - opening.sillHeightMm - opening.heightMm) * scale
+            val color = if (opening.type == OpeningType.WINDOW) Color(0xFF77C8DE) else Color(0xFFF0F2F2)
+            drawRect(color, Offset(x, y), Size(opening.widthMm * scale, h))
+            drawRect(Color(0xFF315C78), Offset(x, y), Size(opening.widthMm * scale, h), style = Stroke(2f))
+        }
+    }
+    EstimateLine("Длина", wall.lengthMm.toInt().toString() + " мм")
+    EstimateLine("Высота", wall.heightMm.toString() + " мм")
+    EstimateLine("Толщина", wall.thicknessMm.toString() + " мм")
+    EstimateLine("Проёмов", openings.size.toString())
+}
+
+@Composable
+private fun EngineeringEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
+    var kind by remember { mutableStateOf(AnnotationKind.SOCKET) }
+    var x by remember { mutableStateOf("500") }
+    var y by remember { mutableStateOf("500") }
+    var label by remember { mutableStateOf("") }
+    var menu by remember { mutableStateOf(false) }
+    Text("Инженерные схемы", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Точки электрики, освещения, водоснабжения, канализации и вентиляции. Они отображаются поверх плана.")
+    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
+        OutlinedTextField(value = kind.title, onValueChange = {}, readOnly = true, label = { Text("Тип точки") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) }, modifier = Modifier.menuAnchor().fillMaxWidth())
+        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            AnnotationKind.values().forEach { option ->
+                DropdownMenuItem(text = { Text(option.title) }, onClick = { kind = option; menu = false })
+            }
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("X, мм", x, { x = it }, Modifier.weight(1f))
+        NumberInput("Y, мм", y, { y = it }, Modifier.weight(1f))
+    }
+    OutlinedTextField(value = label, onValueChange = { label = it.take(40) },
+        label = { Text("Подпись (необязательно)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Button(onClick = {
+        val px = x.toIntOrNull() ?: return@Button
+        val py = y.toIntOrNull() ?: return@Button
+        val annotation = runCatching { PlanAnnotation(UUID.randomUUID().toString(), kind, px, py, label) }.getOrNull() ?: return@Button
+        val updated = runCatching { project.copy(annotations = project.annotations + annotation) }.getOrNull() ?: return@Button
+        change(updated)
+    }, modifier = Modifier.fillMaxWidth()) { Text("Добавить точку на план") }
+    project.annotations.forEach { item ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(item.kind.title + " • X " + item.xMm + " • Y " + item.yMm, Modifier.weight(1f))
+            TextButton(onClick = { change(project.copy(annotations = project.annotations.filterNot { it.id == item.id })) }) { Text("Удалить") }
+        }
+    }
+}
+
+@Composable
+private fun ExportEditor(project: ProjectDocument, onSvg: () -> Unit, onJson: () -> Unit, onCsv: () -> Unit, onImport: () -> Unit) {
+    Text("Экспорт проекта", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("SVG — чертёж с контурами, проёмами, мебелью и инженерными символами. JSON — редактируемый проект. CSV — предварительная смета.")
+    Button(onClick = onSvg, modifier = Modifier.fillMaxWidth()) { Text("Сохранить чертёж SVG") }
+    OutlinedButton(onClick = onJson, modifier = Modifier.fillMaxWidth()) { Text("Сохранить проект JSON") }
+    OutlinedButton(onClick = onCsv, modifier = Modifier.fillMaxWidth()) { Text("Экспортировать смету CSV") }
+    OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) { Text("Импортировать проект JSON") }
+    Text("Сохранение и импорт выполняются через системный диалог Android.")
+}
+
 @Composable
 private fun EstimateLine(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
