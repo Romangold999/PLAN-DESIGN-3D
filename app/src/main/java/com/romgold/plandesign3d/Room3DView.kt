@@ -2,14 +2,14 @@ package com.romgold.plandesign3d
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -21,9 +21,10 @@ import io.github.sceneview.math.Rotation
 import io.github.sceneview.math.Size as SceneSize
 import io.github.sceneview.node.CubeNode
 import com.romgold.plandesign3d.domain.ProjectDocument
-import com.romgold.plandesign3d.domain.OpeningType
 import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
 
 private data class WallPiece(
     val wallIndex: Int,
@@ -74,18 +75,24 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
     val centerZ = project.room.walls.minOf { minOf(it.start.yMm, it.end.yMm) } +
         project.room.boundsDepthMm / 2f
 
-    var cameraPreset by remember(project.room) { mutableStateOf(CameraPreset.ISOMETRIC) }
-    var cameraResetKey by remember { mutableIntStateOf(0) }
+    var cameraYaw by remember(project.room) { mutableFloatStateOf(45f) }
+    var cameraPitch by remember(project.room) { mutableFloatStateOf(42f) }
     val roomSpanMetres = max(project.room.boundsWidthMm, project.room.boundsDepthMm) / 1000f
     val cameraDistance = (roomSpanMetres * 1.35f + 0.8f).coerceAtLeast(2.5f)
-    val cameraEye = when (cameraPreset) {
-        CameraPreset.ISOMETRIC -> Position(cameraDistance * 0.72f, cameraDistance * 0.68f, cameraDistance * 0.9f)
-        CameraPreset.FRONT -> Position(0f, cameraDistance * 0.42f, cameraDistance)
-        CameraPreset.LEFT -> Position(cameraDistance, cameraDistance * 0.42f, 0f)
-        // A slight offset avoids a singular straight-down camera/up-vector alignment.
-        CameraPreset.TOP -> Position(0.01f, cameraDistance, cameraDistance * 0.025f)
-    }
-    val cameraManipulator = key(cameraPreset, cameraResetKey, project.room.boundsWidthMm, project.room.boundsDepthMm) {
+    val yawRadians = Math.toRadians(cameraYaw.toDouble())
+    val pitchRadians = Math.toRadians(cameraPitch.toDouble())
+    val horizontalDistance = cameraDistance * cos(pitchRadians).toFloat()
+    val cameraEye = Position(
+        horizontalDistance * sin(yawRadians).toFloat(),
+        cameraDistance * sin(pitchRadians).toFloat(),
+        horizontalDistance * cos(yawRadians).toFloat()
+    )
+    val cameraManipulator = key(
+        cameraYaw.toInt(),
+        cameraPitch.toInt(),
+        project.room.boundsWidthMm,
+        project.room.boundsDepthMm
+    ) {
         rememberCameraManipulator(
             orbitHomePosition = cameraEye,
             targetPosition = Position(0f, 0f, 0f)
@@ -95,7 +102,7 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
     Column(modifier) {
         Text("3D-модель помещения", modifier = Modifier.padding(bottom = 8.dp))
         Text(
-            "Одним пальцем вращайте модель по горизонтали и вертикали. Двумя пальцами — перемещение и масштаб.",
+            "Вращайте камеру жестом или ползунками на 360° по горизонтали и почти на полный оборот по вертикали. Двумя пальцами — перемещение и масштаб.",
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Row(
@@ -105,7 +112,12 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
             CameraPreset.values().forEach { preset ->
                 OutlinedButton(
                     onClick = {
-                        if (cameraPreset == preset) cameraResetKey++ else cameraPreset = preset
+                        when (preset) {
+                            CameraPreset.ISOMETRIC -> { cameraYaw = 45f; cameraPitch = 42f }
+                            CameraPreset.FRONT -> { cameraYaw = 0f; cameraPitch = 25f }
+                            CameraPreset.LEFT -> { cameraYaw = 90f; cameraPitch = 25f }
+                            CameraPreset.TOP -> { cameraYaw = 0f; cameraPitch = 88f }
+                        }
                     },
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
@@ -114,6 +126,20 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
                 }
             }
         }
+        Text("Поворот вокруг вертикали: ${cameraYaw.toInt()}°")
+        Slider(
+            value = cameraYaw,
+            onValueChange = { cameraYaw = it },
+            valueRange = 0f..360f,
+            steps = 35
+        )
+        Text("Наклон камеры: ${cameraPitch.toInt()}°")
+        Slider(
+            value = cameraPitch,
+            onValueChange = { cameraPitch = it },
+            valueRange = 5f..175f,
+            steps = 33
+        )
         SceneView(
             modifier = Modifier.fillMaxWidth().height(420.dp),
             engine = engine,
