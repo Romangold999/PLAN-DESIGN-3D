@@ -1,9 +1,15 @@
 package com.romgold.plandesign3d
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -17,6 +23,7 @@ import io.github.sceneview.node.CubeNode
 import com.romgold.plandesign3d.domain.ProjectDocument
 import com.romgold.plandesign3d.domain.OpeningType
 import kotlin.math.atan2
+import kotlin.math.max
 
 private data class WallPiece(
     val wallIndex: Int,
@@ -25,6 +32,13 @@ private data class WallPiece(
     val bottomMm: Int,
     val topMm: Int
 )
+
+private enum class CameraPreset(val label: String) {
+    ISOMETRIC("3D"),
+    FRONT("Спереди"),
+    LEFT("Слева"),
+    TOP("Сверху")
+}
 
 private fun makeWallPieces(project: ProjectDocument): List<WallPiece> {
     val result = mutableListOf<WallPiece>()
@@ -60,14 +74,50 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
     val centerZ = project.room.walls.minOf { minOf(it.start.yMm, it.end.yMm) } +
         project.room.boundsDepthMm / 2f
 
+    var cameraPreset by remember(project.room) { mutableStateOf(CameraPreset.ISOMETRIC) }
+    var cameraResetKey by remember { mutableIntStateOf(0) }
+    val roomSpanMetres = max(project.room.boundsWidthMm, project.room.boundsDepthMm) / 1000f
+    val cameraDistance = (roomSpanMetres * 1.35f + 0.8f).coerceAtLeast(2.5f)
+    val cameraEye = when (cameraPreset) {
+        CameraPreset.ISOMETRIC -> Position(cameraDistance * 0.72f, cameraDistance * 0.68f, cameraDistance * 0.9f)
+        CameraPreset.FRONT -> Position(0f, cameraDistance * 0.42f, cameraDistance)
+        CameraPreset.LEFT -> Position(cameraDistance, cameraDistance * 0.42f, 0f)
+        // A slight offset avoids a singular straight-down camera/up-vector alignment.
+        CameraPreset.TOP -> Position(0.01f, cameraDistance, cameraDistance * 0.025f)
+    }
+    val cameraManipulator = key(cameraPreset, cameraResetKey, project.room.boundsWidthMm, project.room.boundsDepthMm) {
+        rememberCameraManipulator(
+            orbitHomePosition = cameraEye,
+            targetPosition = Position(0f, 0f, 0f)
+        )
+    }
+
     Column(modifier) {
         Text("3D-модель помещения", modifier = Modifier.padding(bottom = 8.dp))
-        Text("Проведите пальцем для вращения, двумя пальцами — для масштаба и перемещения.",
-            modifier = Modifier.padding(bottom = 8.dp))
+        Text(
+            "Одним пальцем вращайте модель по горизонтали и вертикали. Двумя пальцами — перемещение и масштаб.",
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            CameraPreset.values().forEach { preset ->
+                OutlinedButton(
+                    onClick = {
+                        if (cameraPreset == preset) cameraResetKey++ else cameraPreset = preset
+                    },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+                ) {
+                    Text(preset.label, maxLines = 1)
+                }
+            }
+        }
         SceneView(
             modifier = Modifier.fillMaxWidth().height(420.dp),
             engine = engine,
-            cameraManipulator = rememberCameraManipulator()
+            cameraManipulator = cameraManipulator
         ) {
             val floorMaterial = remember(materialLoader, project.floorFinish.colorArgb) {
                 materialLoader.createColorInstance(Color(project.floorFinish.colorArgb), metallic = 0f, roughness = 0.85f)
