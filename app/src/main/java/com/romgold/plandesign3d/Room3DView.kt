@@ -99,7 +99,8 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
                         (item.xMm + item.widthMm / 2f - centerX) / 1000f,
                         0.325f,
                         (item.yMm + item.depthMm / 2f - centerZ) / 1000f
-                    )
+                    ),
+                    rotation = Rotation(y = Math.toRadians(item.rotationDegrees.toDouble()).toFloat())
                 )
             }
         }
