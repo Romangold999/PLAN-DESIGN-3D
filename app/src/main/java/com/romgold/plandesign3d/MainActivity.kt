@@ -374,7 +374,8 @@ private fun FinishEditor(project: ProjectDocument, change: (ProjectDocument) -> 
         label = { Text("Цвет пола ARGB (HEX)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     NumberInput("Цена пола, ₽/м²", floorPrice, { floorPrice = it })
     OutlinedButton(onClick = {
-        val color = floorColor.toLongOrNull(16) ?: return@OutlinedButton
+        val rawColor = floorColor.toLongOrNull(16) ?: return@OutlinedButton
+        val color = if (floorColor.length <= 6) (0xFF000000L or rawColor) else rawColor
         val price = floorPrice.toDoubleOrNull()?.coerceAtLeast(0.0) ?: return@OutlinedButton
         change(project.copy(floorFinish = project.floorFinish.copy(colorArgb = color, pricePerSquareMetre = price)))
     }, modifier = Modifier.fillMaxWidth()) { Text("Применить цвет и цену пола") }
@@ -382,7 +383,8 @@ private fun FinishEditor(project: ProjectDocument, change: (ProjectDocument) -> 
         label = { Text("Цвет стен ARGB (HEX)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     NumberInput("Цена стен, ₽/м²", wallPrice, { wallPrice = it })
     OutlinedButton(onClick = {
-        val color = wallColor.toLongOrNull(16) ?: return@OutlinedButton
+        val rawColor = wallColor.toLongOrNull(16) ?: return@OutlinedButton
+        val color = if (wallColor.length <= 6) (0xFF000000L or rawColor) else rawColor
         val price = wallPrice.toDoubleOrNull()?.coerceAtLeast(0.0) ?: return@OutlinedButton
         change(project.copy(wallFinish = project.wallFinish.copy(colorArgb = color, pricePerSquareMetre = price)))
     }, modifier = Modifier.fillMaxWidth()) { Text("Применить цвет и цену стен") }
