@@ -222,10 +222,13 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                 }
             }
             project.furniture.forEach { item ->
-                val p = point(item.xMm, item.yMm)
+                val rotated = item.rotationDegrees % 180 != 0
+                val effectiveWidth = if (rotated) item.depthMm else item.widthMm
+                val effectiveDepth = if (rotated) item.widthMm else item.depthMm
+                val center = point(item.xMm + effectiveWidth / 2, item.yMm + effectiveDepth / 2)
                 val s = Size(item.widthMm * scale, item.depthMm * scale)
-                val pivot = Offset(p.x + s.width / 2f, p.y + s.height / 2f)
-                rotate(item.rotationDegrees.toFloat(), pivot) {
+                val p = Offset(center.x - s.width / 2f, center.y - s.height / 2f)
+                rotate(item.rotationDegrees.toFloat(), center) {
                     drawRect(Color(0xFFB77B55), p, s)
                     drawRect(Color(0xFF704D3A), p, s, style = Stroke(2f))
                 }
