@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import org.json.JSONObject
 import kotlin.math.min
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
