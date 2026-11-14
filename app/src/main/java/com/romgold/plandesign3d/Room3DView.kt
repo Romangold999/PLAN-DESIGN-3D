@@ -105,12 +105,15 @@ fun Room3DView(project: ProjectDocument, modifier: Modifier = Modifier) {
                 }
             }
             project.furniture.forEach { item ->
+                val rotated = item.rotationDegrees % 180 != 0
+                val effectiveWidth = if (rotated) item.depthMm else item.widthMm
+                val effectiveDepth = if (rotated) item.widthMm else item.depthMm
                 CubeNode(
                     size = SceneSize(item.widthMm / 1000f, 0.65f, item.depthMm / 1000f),
                     position = Position(
-                        (item.xMm + item.widthMm / 2f - centerX) / 1000f,
+                        (item.xMm + effectiveWidth / 2f - centerX) / 1000f,
                         0.325f,
-                        (item.yMm + item.depthMm / 2f - centerZ) / 1000f
+                        (item.yMm + effectiveDepth / 2f - centerZ) / 1000f
                     ),
                     rotation = Rotation(y = Math.toRadians(item.rotationDegrees.toDouble()).toFloat()),
                     materialInstance = furnitureMaterial
