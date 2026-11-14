@@ -60,7 +60,7 @@ class ProjectModelTest {
 
     @Test fun rotatedFurnitureUsesSwappedDimensionsForClearance() {
         val first = FurnitureItem("first", FurnitureKind.TABLE, 0, 0, widthMm = 1200, depthMm = 600)
-        val rotated = FurnitureItem("rotated", FurnitureKind.TABLE, 0, 1800,
+        val rotated = FurnitureItem("rotated", FurnitureKind.TABLE, 0, 600,
             widthMm = 1200, depthMm = 600, rotationDegrees = 90)
         val results = findNarrowFurniturePassages(listOf(first, rotated), 700)
         assertEquals(1, results.size)
