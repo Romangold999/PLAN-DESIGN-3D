@@ -39,7 +39,7 @@ import java.util.UUID
 import kotlin.math.min
 
 private enum class EditorTab(val title: String) {
-    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), SURFACE("Раскладка"), ELEVATIONS("Развёртки"), EXPORT("Экспорт")
+    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), SURFACE("Раскладка"), ELEVATIONS("Развёртки"), ENGINEERING("Инженерия"), EXPORT("Экспорт")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity() {
                                 EditorTab.THREE_D -> Room3DView(project, Modifier.fillMaxWidth())
                                 EditorTab.SURFACE -> SurfaceLayoutEditor(project, change)
                                 EditorTab.ELEVATIONS -> WallElevationEditor(project)
+                                EditorTab.ENGINEERING -> EngineeringEditor(project, change)
                                 EditorTab.EXPORT -> ExportEditor(
                                     project,
                                     onSvg = { pendingExport = ProjectSvgExporter.encode(project); svgLauncher.launch(project.name + ".svg") },
@@ -246,6 +247,19 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
                     drawRect(Color(0xFFB77B55), p, s)
                     drawRect(Color(0xFF704D3A), p, s, style = Stroke(2f))
                 }
+            }
+            project.annotations.forEach { annotation ->
+                val center = point(annotation.xMm, annotation.yMm)
+                val color = when (annotation.kind) {
+                    AnnotationKind.SOCKET -> Color(0xFF2D8A57)
+                    AnnotationKind.SWITCH -> Color(0xFFDA9A27)
+                    AnnotationKind.LIGHT -> Color(0xFFE8C547)
+                    AnnotationKind.WATER -> Color(0xFF2D9CCB)
+                    AnnotationKind.DRAIN -> Color(0xFF536B9B)
+                    AnnotationKind.VENTILATION -> Color(0xFF8B65A8)
+                }
+                drawCircle(color, radius = 9f, center = center)
+                drawCircle(Color(0xFF263238), radius = 9f, center = center, style = Stroke(2f))
             }
         }
     }
@@ -538,6 +552,46 @@ private fun WallElevationEditor(project: ProjectDocument) {
     openings.forEachIndexed { index, opening ->
         Text((index + 1).toString() + ". " + (if (opening.type == OpeningType.DOOR) "Дверь" else "Окно") +
             " • отступ " + opening.offsetMm + " мм • " + opening.widthMm + "×" + opening.heightMm + " мм")
+    }
+}
+
+
+@Composable
+private fun EngineeringEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
+    var kind by remember { mutableStateOf(AnnotationKind.SOCKET) }
+    var x by remember { mutableStateOf("500") }
+    var y by remember { mutableStateOf("500") }
+    var label by remember { mutableStateOf("") }
+    var menu by remember { mutableStateOf(false) }
+    Text("Инженерные схемы", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Добавляйте точки электрики, освещения, водоснабжения, канализации и вентиляции. Символы отображаются поверх 2D-плана.")
+    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
+        OutlinedTextField(value = kind.title, onValueChange = {}, readOnly = true, label = { Text("Тип точки") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) }, modifier = Modifier.menuAnchor().fillMaxWidth())
+        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            AnnotationKind.values().forEach { option ->
+                DropdownMenuItem(text = { Text(option.title) }, onClick = { kind = option; menu = false })
+            }
+        }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("X, мм", x, { x = it }, Modifier.weight(1f))
+        NumberInput("Y, мм", y, { y = it }, Modifier.weight(1f))
+    }
+    OutlinedTextField(value = label, onValueChange = { label = it.take(40) }, label = { Text("Подпись (необязательно)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    Button(onClick = {
+        val px = x.toIntOrNull() ?: return@Button
+        val py = y.toIntOrNull() ?: return@Button
+        val annotation = runCatching { PlanAnnotation(UUID.randomUUID().toString(), kind, px, py, label) }.getOrNull() ?: return@Button
+        val updated = runCatching { project.copy(annotations = project.annotations + annotation) }.getOrNull() ?: return@Button
+        change(updated)
+    }, modifier = Modifier.fillMaxWidth()) { Text("Добавить точку на план") }
+    Text("Точки проекта: " + project.annotations.size, fontWeight = FontWeight.Bold)
+    project.annotations.forEach { item ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(item.kind.title + " • X " + item.xMm + " • Y " + item.yMm, Modifier.weight(1f))
+            TextButton(onClick = { change(project.copy(annotations = project.annotations.filterNot { it.id == item.id })) }) { Text("Удалить") }
+        }
     }
 }
 
