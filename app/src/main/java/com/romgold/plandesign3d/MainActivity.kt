@@ -214,48 +214,9 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     var projectName by remember(project.id, project.name) { mutableStateOf(project.name) }
+    var showGeometryTools by remember { mutableStateOf(false) }
     Text("План помещения", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    OutlinedTextField(value = projectName, onValueChange = { projectName = it }, label = { Text("Название проекта") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    OutlinedButton(onClick = { if (projectName.isNotBlank()) change(project.copy(name = projectName.trim())) }, modifier = Modifier.fillMaxWidth()) { Text("Переименовать проект") }
-    Text("Все размеры хранятся в миллиметрах. Масштабирование не меняет исходную геометрию.")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberInput("Ширина, мм", widthText, { widthText = it }, Modifier.weight(1f))
-        NumberInput("Глубина, мм", depthText, { depthText = it }, Modifier.weight(1f))
-    }
-    Button(onClick = {
-        val w = widthText.toIntOrNull()?.coerceIn(1000, 30000) ?: return@Button
-        val d = depthText.toIntOrNull()?.coerceIn(1000, 30000) ?: return@Button
-        change(project.copy(room = RoomPlan.rectangle(w, d), furniture = emptyList()))
-        zoom = 1f
-        pan = Offset.Zero
-    }, modifier = Modifier.fillMaxWidth()) { Text("Применить размеры") }
-
-    var pointX by remember { mutableStateOf("0") }
-    var pointY by remember { mutableStateOf("0") }
-    var vertices by remember(project.room) { mutableStateOf(project.room.walls.map { it.start }) }
-    Text("Нестандартная геометрия", fontWeight = FontWeight.Bold)
-    Text("Задайте углы помещения координатами X/Y в миллиметрах. Точки соединяются по порядку и автоматически замыкаются.")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberInput("X, мм", pointX, { pointX = it }, Modifier.weight(1f))
-        NumberInput("Y, мм", pointY, { pointY = it }, Modifier.weight(1f))
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = {
-            val x = pointX.toIntOrNull() ?: return@OutlinedButton
-            val y = pointY.toIntOrNull() ?: return@OutlinedButton
-            val point = Point2(x, y)
-            if (point !in vertices) vertices = vertices + point
-        }, modifier = Modifier.weight(1f)) { Text("Добавить угол") }
-        OutlinedButton(onClick = { if (vertices.isNotEmpty()) vertices = vertices.dropLast(1) },
-            enabled = vertices.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Убрать последний") }
-    }
-    Text("Вершины: " + vertices.joinToString("  →  ") { "(" + it.xMm + "; " + it.yMm + ")" }, fontSize = 12.sp)
-    Button(onClick = {
-        val shape = runCatching { RoomPlan.fromPoints(vertices, project.room.walls.first().thicknessMm, project.room.walls.first().heightMm) }.getOrNull()
-            ?: return@Button
-        change(project.copy(room = shape, furniture = emptyList()))
-    }, enabled = vertices.size >= 3, modifier = Modifier.fillMaxWidth()) { Text("Построить помещение по контуру") }
-
+    Text("Рабочий чертёж • мм • касание двумя пальцами — масштаб и перемещение", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
     Box(Modifier.fillMaxWidth().height(340.dp).background(Color(0xFF151D24), RoundedCornerShape(12.dp)).padding(8.dp)) {
         Canvas(Modifier.fillMaxSize().pointerInput(project.room) {
             detectTransformGestures { _, delta, zoomDelta, _ ->
@@ -350,6 +311,65 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     }
     val metrics = project.room.metrics()
     Text("Площадь пола: %.2f м² • Периметр: %.2f м".format(metrics.floorAreaM2, metrics.perimeterM))
+    OutlinedButton(
+        onClick = { showGeometryTools = !showGeometryTools },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(if (showGeometryTools) "Скрыть параметры помещения ▲" else "Параметры и геометрия помещения ▼")
+    }
+    if (showGeometryTools) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1B252D)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                Modifier.fillMaxWidth().padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                    Text("План помещения", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                    OutlinedTextField(value = projectName, onValueChange = { projectName = it }, label = { Text("Название проекта") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    OutlinedButton(onClick = { if (projectName.isNotBlank()) change(project.copy(name = projectName.trim())) }, modifier = Modifier.fillMaxWidth()) { Text("Переименовать проект") }
+                    Text("Все размеры хранятся в миллиметрах. Масштабирование не меняет исходную геометрию.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberInput("Ширина, мм", widthText, { widthText = it }, Modifier.weight(1f))
+                        NumberInput("Глубина, мм", depthText, { depthText = it }, Modifier.weight(1f))
+                    }
+                    Button(onClick = {
+                        val w = widthText.toIntOrNull()?.coerceIn(1000, 30000) ?: return@Button
+                        val d = depthText.toIntOrNull()?.coerceIn(1000, 30000) ?: return@Button
+                        change(project.copy(room = RoomPlan.rectangle(w, d), furniture = emptyList()))
+                        zoom = 1f
+                        pan = Offset.Zero
+                    }, modifier = Modifier.fillMaxWidth()) { Text("Применить размеры") }
+                
+                    var pointX by remember { mutableStateOf("0") }
+                    var pointY by remember { mutableStateOf("0") }
+                    var vertices by remember(project.room) { mutableStateOf(project.room.walls.map { it.start }) }
+                    Text("Нестандартная геометрия", fontWeight = FontWeight.Bold)
+                    Text("Задайте углы помещения координатами X/Y в миллиметрах. Точки соединяются по порядку и автоматически замыкаются.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberInput("X, мм", pointX, { pointX = it }, Modifier.weight(1f))
+                        NumberInput("Y, мм", pointY, { pointY = it }, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = {
+                            val x = pointX.toIntOrNull() ?: return@OutlinedButton
+                            val y = pointY.toIntOrNull() ?: return@OutlinedButton
+                            val point = Point2(x, y)
+                            if (point !in vertices) vertices = vertices + point
+                        }, modifier = Modifier.weight(1f)) { Text("Добавить угол") }
+                        OutlinedButton(onClick = { if (vertices.isNotEmpty()) vertices = vertices.dropLast(1) },
+                            enabled = vertices.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Убрать последний") }
+                    }
+                    Text("Вершины: " + vertices.joinToString("  →  ") { "(" + it.xMm + "; " + it.yMm + ")" }, fontSize = 12.sp)
+                    Button(onClick = {
+                        val shape = runCatching { RoomPlan.fromPoints(vertices, project.room.walls.first().thicknessMm, project.room.walls.first().heightMm) }.getOrNull()
+                            ?: return@Button
+                        change(project.copy(room = shape, furniture = emptyList()))
+                    }, enabled = vertices.size >= 3, modifier = Modifier.fillMaxWidth()) { Text("Построить помещение по контуру") }
+            }
+        }
+    }
 }
 
 
