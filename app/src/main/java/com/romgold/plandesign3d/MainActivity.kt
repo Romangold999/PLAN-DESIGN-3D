@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.romgold.plandesign3d.data.ProjectStore
 import com.romgold.plandesign3d.data.ProjectCodec
 import com.romgold.plandesign3d.data.ProjectSvgExporter
+import com.romgold.plandesign3d.data.EstimateCsvExporter
 import com.romgold.plandesign3d.domain.*
 import java.util.UUID
 import kotlin.math.min
@@ -54,6 +55,9 @@ class MainActivity : ComponentActivity() {
                 if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
             }
             val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+                if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
+            }
+            val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
                 if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
             }
             MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF315C78), secondary = Color(0xFF668A78))) {
@@ -143,6 +147,7 @@ class MainActivity : ComponentActivity() {
                                     project,
                                     onSvg = { pendingExport = ProjectSvgExporter.encode(project); svgLauncher.launch(project.name + ".svg") },
                                     onJson = { pendingExport = ProjectCodec.encode(project); jsonLauncher.launch(project.name + ".json") },
+                                    onCsv = { pendingExport = EstimateCsvExporter.encode(project); csvLauncher.launch(project.name + "-smeta.csv") },
                                     onImport = { importLauncher.launch(arrayOf("application/json", "text/plain")) }
                                 )
                             }
