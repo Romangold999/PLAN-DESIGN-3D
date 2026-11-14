@@ -160,3 +160,100 @@ fun findNarrowFurniturePassages(
         }
     }.sortedBy { it.distanceMm }
 }
+
+
+data class FurnitureWallClearance(
+    val furniture: FurnitureItem,
+    val wallIndex: Int,
+    val distanceMm: Int
+)
+
+/** Estimates the shortest clearance from each furniture footprint to the room's wall faces. */
+fun findFurnitureWallClearances(
+    room: RoomPlan,
+    furniture: List<FurnitureItem>,
+    minimumClearanceMm: Int = 600
+): List<FurnitureWallClearance> {
+    require(minimumClearanceMm >= 0)
+    val minX = room.walls.minOf { minOf(it.start.xMm, it.end.xMm) }
+    val minY = room.walls.minOf { minOf(it.start.yMm, it.end.yMm) }
+    fun pointSegmentDistance(px: Double, py: Double, ax: Double, ay: Double, bx: Double, by: Double): Double {
+        val dx = bx - ax
+        val dy = by - ay
+        val lengthSquared = dx * dx + dy * dy
+        if (lengthSquared == 0.0) return hypot(px - ax, py - ay)
+        val t = (((px - ax) * dx + (py - ay) * dy) / lengthSquared).coerceIn(0.0, 1.0)
+        return hypot(px - (ax + t * dx), py - (ay + t * dy))
+    }
+    fun pointInRect(px: Double, py: Double, left: Double, top: Double, right: Double, bottom: Double) =
+        px >= left && px <= right && py >= top && py <= bottom
+    fun orientation(ax: Double, ay: Double, bx: Double, by: Double, cx: Double, cy: Double) =
+        (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    fun segmentsCross(ax: Double, ay: Double, bx: Double, by: Double, cx: Double, cy: Double, dx: Double, dy: Double): Boolean {
+        val o1 = orientation(ax, ay, bx, by, cx, cy)
+        val o2 = orientation(ax, ay, bx, by, dx, dy)
+        val o3 = orientation(cx, cy, dx, dy, ax, ay)
+        val o4 = orientation(cx, cy, dx, dy, bx, by)
+        return ((o1 <= 0.0 && o2 >= 0.0) || (o1 >= 0.0 && o2 <= 0.0)) &&
+            ((o3 <= 0.0 && o4 >= 0.0) || (o3 >= 0.0 && o4 <= 0.0))
+    }
+    fun segmentRectDistance(ax: Double, ay: Double, bx: Double, by: Double,
+                            left: Double, top: Double, right: Double, bottom: Double): Double {
+        if (pointInRect(ax, ay, left, top, right, bottom) || pointInRect(bx, by, left, top, right, bottom)) return 0.0
+        val corners = listOf(left to top, right to top, right to bottom, left to bottom)
+        for (i in corners.indices) {
+            val a = corners[i]
+            val b = corners[(i + 1) % corners.size]
+            if (segmentsCross(ax, ay, bx, by, a.first, a.second, b.first, b.second)) return 0.0
+        }
+        val cornerDistance = corners.minOf { pointSegmentDistance(it.first, it.second, ax, ay, bx, by) }
+        fun pointRectDistance(px: Double, py: Double): Double {
+            val dx = maxOf(left - px, 0.0, px - right)
+            val dy = maxOf(top - py, 0.0, py - bottom)
+            return hypot(dx, dy)
+        }
+        return minOf(cornerDistance, pointRectDistance(ax, ay), pointRectDistance(bx, by))
+    }
+
+    buildList {
+        furniture.forEach { item ->
+            val rotated = item.rotationDegrees % 180 != 0
+            val width = if (rotated) item.depthMm else item.widthMm
+            val depth = if (rotated) item.widthMm else item.depthMm
+            val left = item.xMm.toDouble()
+            val top = item.yMm.toDouble()
+            val right = left + width
+            val bottom = top + depth
+            val candidates = mutableListOf<FurnitureWallClearance>()
+            room.walls.forEachIndexed { wallIndex, wall ->
+                val dx = (wall.end.xMm - wall.start.xMm).toDouble()
+                val dy = (wall.end.yMm - wall.start.yMm).toDouble()
+                val length = hypot(dx, dy)
+                val ux = dx / length
+                val uy = dy / length
+                val doorIntervals = room.openings.filter {
+                    it.wallIndex == wallIndex && it.type == OpeningType.DOOR
+                }.sortedBy { it.offsetMm }
+                val solidRanges = mutableListOf<Pair<Double, Double>>()
+                var cursor = 0.0
+                doorIntervals.forEach { door ->
+                    if (door.offsetMm > cursor) solidRanges += cursor to door.offsetMm.toDouble()
+                    cursor = (door.offsetMm + door.widthMm).toDouble()
+                }
+                if (cursor < length) solidRanges += cursor to length
+                solidRanges.forEach { (from, to) ->
+                    val ax = wall.start.xMm - minX + ux * from
+                    val ay = wall.start.yMm - minY + uy * from
+                    val bx = wall.start.xMm - minX + ux * to
+                    val by = wall.start.yMm - minY + uy * to
+                    val centerlineDistance = segmentRectDistance(ax, ay, bx, by, left, top, right, bottom)
+                    val clearance = (centerlineDistance - wall.thicknessMm / 2.0).toInt()
+                    if (clearance < minimumClearanceMm) {
+                        candidates += FurnitureWallClearance(item, wallIndex, clearance)
+                    }
+                }
+            }
+            candidates.minByOrNull { it.distanceMm }?.let(::add)
+        }
+    }.sortedBy { it.distanceMm }
+}
