@@ -28,7 +28,14 @@ object ProjectCodec {
         return JSONObject().put("schemaVersion", 2).put("id", project.id).put("name", project.name)
             .put("walls", walls).put("openings", openings).put("furniture", furniture)
             .put("floorFinish", material(project.floorFinish)).put("wallFinish", material(project.wallFinish))
-            .put("floorWaste", project.floorWastePercent).put("wallWaste", project.wallWastePercent).toString()
+            .put("floorWaste", project.floorWastePercent).put("wallWaste", project.wallWastePercent)
+            .put("surfaceLayout", JSONObject()
+                .put("tileWidth", project.surfaceLayout.tileWidthMm)
+                .put("tileHeight", project.surfaceLayout.tileHeightMm)
+                .put("grout", project.surfaceLayout.groutMm)
+                .put("rotation", project.surfaceLayout.rotationDegrees)
+                .put("waste", project.surfaceLayout.wastePercent)
+                .put("pattern", project.surfaceLayout.pattern.name)).toString()
     }
 
     fun decode(json: String): ProjectDocument {
@@ -58,9 +65,16 @@ object ProjectCodec {
                 FinishCategory.valueOf(m.optString("category", fallback.category.name)),
                 m.optLong("color", fallback.colorArgb), m.optDouble("price", fallback.pricePerSquareMetre))
         }
+        val layoutJson = root.optJSONObject("surfaceLayout") ?: JSONObject()
+        val layout = SurfaceLayout(
+            layoutJson.optInt("tileWidth", 600), layoutJson.optInt("tileHeight", 600),
+            layoutJson.optInt("grout", 2), layoutJson.optInt("rotation", 0),
+            layoutJson.optDouble("waste", 10.0),
+            SurfacePattern.valueOf(layoutJson.optString("pattern", SurfacePattern.STRAIGHT.name))
+        )
         return ProjectDocument(root.optString("id", UUID.randomUUID().toString()), root.optString("name", "Мой проект"),
             RoomPlan(walls, openings), furniture, readMaterial("floorFinish", defaultFloorMaterials.first()),
             readMaterial("wallFinish", defaultWallMaterials.first()), root.optDouble("floorWaste", 10.0),
-            root.optDouble("wallWaste", 10.0))
+            root.optDouble("wallWaste", 10.0), layout)
     }
 }
