@@ -47,6 +47,9 @@ data class RoomPlan(
 ) {
     init {
         require(walls.size >= 3) { "A room needs at least three walls" }
+        require(walls.indices.all { index ->
+            walls[index].end == walls[(index + 1) % walls.size].start
+        }) { "Room walls must form one connected closed loop" }
         openings.forEach { opening ->
             require(opening.wallIndex in walls.indices) { "Opening references a missing wall" }
             require(opening.offsetMm + opening.widthMm <= walls[opening.wallIndex].lengthMm) {
