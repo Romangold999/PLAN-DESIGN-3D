@@ -389,6 +389,31 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     }
     val metrics = project.room.metrics()
     Text("Площадь пола: %.2f м² • Периметр: %.2f м".format(metrics.floorAreaM2, metrics.perimeterM))
+    val furnitureOverlaps = buildList {
+        project.furniture.forEachIndexed { index, first ->
+            project.furniture.drop(index + 1).forEach { second ->
+                val firstRotated = first.rotationDegrees % 180 != 0
+                val secondRotated = second.rotationDegrees % 180 != 0
+                val firstWidth = if (firstRotated) first.depthMm else first.widthMm
+                val firstDepth = if (firstRotated) first.widthMm else first.depthMm
+                val secondWidth = if (secondRotated) second.depthMm else second.widthMm
+                val secondDepth = if (secondRotated) second.widthMm else second.depthMm
+                val intersects = first.xMm < second.xMm + secondWidth && first.xMm + firstWidth > second.xMm && first.yMm < second.yMm + secondDepth && first.yMm + firstDepth > second.yMm
+                if (intersects) add(first to second)
+            }
+        }
+    }
+    if (furnitureOverlaps.isNotEmpty()) {
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF3A2922))) {
+            Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Обнаружены пересечения мебели: ${furnitureOverlaps.size}", color = Color(0xFFFFC49B), fontWeight = FontWeight.Bold)
+                furnitureOverlaps.take(4).forEach { (first, second) ->
+                    Text("${first.kind.title} ↔ ${second.kind.title}", color = Color(0xFFFFDCC7), fontSize = 12.sp)
+                }
+                if (furnitureOverlaps.size > 4) Text("И ещё ${furnitureOverlaps.size - 4} пересечений", color = Color(0xFFFFDCC7), fontSize = 12.sp)
+            }
+        }
+    }
     val selectedFurniture = project.furniture.firstOrNull { it.id == selectedFurnitureId }
     if (selectedFurniture != null) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF20313B))) {
