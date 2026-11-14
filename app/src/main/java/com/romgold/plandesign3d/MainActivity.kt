@@ -23,6 +23,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.runtime.key
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -220,8 +222,11 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
             project.furniture.forEach { item ->
                 val p = point(item.xMm, item.yMm)
                 val s = Size(item.widthMm * scale, item.depthMm * scale)
-                drawRect(Color(0xFFB77B55), p, s)
-                drawRect(Color(0xFF704D3A), p, s, style = Stroke(2f))
+                val pivot = Offset(p.x + s.width / 2f, p.y + s.height / 2f)
+                rotate(item.rotationDegrees.toFloat(), pivot) {
+                    drawRect(Color(0xFFB77B55), p, s)
+                    drawRect(Color(0xFF704D3A), p, s, style = Stroke(2f))
+                }
             }
         }
     }
@@ -292,7 +297,7 @@ private fun FurnitureEditor(project: ProjectDocument, change: (ProjectDocument) 
     var selected by remember { mutableStateOf(FurnitureKind.SOFA) }
     var menu by remember { mutableStateOf(false) }
     Text("Мебель и оборудование", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    Text("Добавляйте типовые объекты. Их габариты и положение отображаются на плане.")
+    Text("Добавляйте типовые объекты, задавайте координаты и поворачивайте их на 90 градусов.")
     ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
         OutlinedTextField(value = selected.title, onValueChange = {}, readOnly = true, label = { Text("Объект") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) }, modifier = Modifier.menuAnchor().fillMaxWidth())
@@ -304,19 +309,46 @@ private fun FurnitureEditor(project: ProjectDocument, change: (ProjectDocument) 
         }
     }
     Button(onClick = {
+        val rotated = selected.widthMm > project.room.boundsWidthMm || selected.depthMm > project.room.boundsDepthMm
+        if (rotated) return@Button
         val x = ((project.room.boundsWidthMm - selected.widthMm) / 2).coerceAtLeast(0)
         val y = ((project.room.boundsDepthMm - selected.depthMm) / 2).coerceAtLeast(0)
         val item = FurnitureItem(UUID.randomUUID().toString(), selected, x, y)
         change(project.copy(furniture = project.furniture + item))
     }, modifier = Modifier.fillMaxWidth()) { Text("Добавить объект на план") }
+
     project.furniture.forEach { item ->
-        Card {
-            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(item.kind.title, fontWeight = FontWeight.SemiBold)
-                    Text(item.widthMm.toString() + " × " + item.depthMm + " мм • X " + item.xMm + ", Y " + item.yMm)
+        key(item.id) {
+            var xText by remember(item.id, item.xMm) { mutableStateOf(item.xMm.toString()) }
+            var yText by remember(item.id, item.yMm) { mutableStateOf(item.yMm.toString()) }
+            Card {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(item.kind.title + " • " + item.widthMm + " × " + item.depthMm + " мм", fontWeight = FontWeight.SemiBold)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NumberInput("X, мм", xText, { xText = it }, Modifier.weight(1f))
+                        NumberInput("Y, мм", yText, { yText = it }, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(onClick = {
+                            val x = xText.toIntOrNull() ?: return@OutlinedButton
+                            val y = yText.toIntOrNull() ?: return@OutlinedButton
+                            val updated = project.furniture.map { if (it.id == item.id) it.copy(xMm = x, yMm = y) else it }
+                            val valid = runCatching { project.copy(furniture = updated) }.getOrNull() ?: return@OutlinedButton
+                            change(valid)
+                        }, modifier = Modifier.weight(1f)) { Text("Переместить") }
+                        OutlinedButton(onClick = {
+                            val rotation = (item.rotationDegrees + 90) % 360
+                            val rotated = rotation % 180 != 0
+                            val w = if (rotated) item.depthMm else item.widthMm
+                            val d = if (rotated) item.widthMm else item.depthMm
+                            val x = item.xMm.coerceIn(0, (project.room.boundsWidthMm - w).coerceAtLeast(0))
+                            val y = item.yMm.coerceIn(0, (project.room.boundsDepthMm - d).coerceAtLeast(0))
+                            val updated = project.furniture.map { if (it.id == item.id) it.copy(xMm = x, yMm = y, rotationDegrees = rotation) else it }
+                            change(project.copy(furniture = updated))
+                        }, modifier = Modifier.weight(1f)) { Text("Поворот 90°") }
+                        TextButton(onClick = { change(project.copy(furniture = project.furniture.filterNot { it.id == item.id })) }) { Text("Удалить") }
+                    }
                 }
-                TextButton(onClick = { change(project.copy(furniture = project.furniture.filterNot { it.id == item.id })) }) { Text("Удалить") }
             }
         }
     }
