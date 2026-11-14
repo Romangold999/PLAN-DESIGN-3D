@@ -49,11 +49,15 @@ data class ProjectDocument(
     val wallFinish: FinishMaterial = FinishMaterial("wall-white", "Белая краска", FinishCategory.WALL, 0xFFF4F2EC, 650.0),
     val floorWastePercent: Double = 10.0,
     val wallWastePercent: Double = 10.0,
-    val surfaceLayout: SurfaceLayout = SurfaceLayout()
+    val surfaceLayout: SurfaceLayout = SurfaceLayout(),
+    val annotations: List<PlanAnnotation> = emptyList()
 ) {
     init {
         require(name.isNotBlank())
         require(floorWastePercent in 0.0..100.0 && wallWastePercent in 0.0..100.0)
+        annotations.forEach { annotation ->
+            require(annotation.xMm <= room.boundsWidthMm && annotation.yMm <= room.boundsDepthMm)
+        }
         furniture.forEach { item ->
             require(item.xMm >= 0 && item.yMm >= 0)
             val rotated = item.rotationDegrees % 180 != 0
