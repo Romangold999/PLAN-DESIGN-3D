@@ -1,6 +1,7 @@
 package com.romgold.plandesign3d.domain
 
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 enum class FurnitureKind(val title: String, val widthMm: Int, val depthMm: Int) {
     SOFA("Диван", 2200, 900),
@@ -108,3 +109,54 @@ val defaultWallMaterials = listOf(
     FinishMaterial("wallpaper", "Обои", FinishCategory.WALL, 0xFFD7DCE0, 900.0),
     FinishMaterial("stone", "Камень", FinishCategory.WALL, 0xFFAAA39A, 2800.0)
 )
+
+
+data class FurnitureClearance(
+    val first: FurnitureItem,
+    val second: FurnitureItem,
+    val distanceMm: Int
+)
+
+/**
+ * Finds non-overlapping furniture pairs with a narrow gap.
+ * Rectangles are axis-aligned; quarter-turn rotations swap width and depth.
+ */
+fun findNarrowFurniturePassages(
+    furniture: List<FurnitureItem>,
+    minimumClearanceMm: Int = 600
+): List<FurnitureClearance> {
+    require(minimumClearanceMm >= 0)
+    return buildList {
+        furniture.forEachIndexed { index, first ->
+            furniture.drop(index + 1).forEach { second ->
+                val firstRotated = first.rotationDegrees % 180 != 0
+                val secondRotated = second.rotationDegrees % 180 != 0
+                val firstWidth = if (firstRotated) first.depthMm else first.widthMm
+                val firstDepth = if (firstRotated) first.widthMm else first.depthMm
+                val secondWidth = if (secondRotated) second.depthMm else second.widthMm
+                val secondDepth = if (secondRotated) second.widthMm else second.depthMm
+
+                val overlapX = first.xMm < second.xMm + secondWidth &&
+                    first.xMm + firstWidth > second.xMm
+                val overlapY = first.yMm < second.yMm + secondDepth &&
+                    first.yMm + firstDepth > second.yMm
+                if (overlapX && overlapY) return@forEach
+
+                val gapX = maxOf(
+                    first.xMm - (second.xMm + secondWidth),
+                    second.xMm - (first.xMm + firstWidth),
+                    0
+                )
+                val gapY = maxOf(
+                    first.yMm - (second.yMm + secondDepth),
+                    second.yMm - (first.yMm + firstDepth),
+                    0
+                )
+                val distance = sqrt(gapX.toDouble() * gapX + gapY.toDouble() * gapY).toInt()
+                if (distance < minimumClearanceMm) {
+                    add(FurnitureClearance(first, second, distance))
+                }
+            }
+        }
+    }.sortedBy { it.distanceMm }
+}
