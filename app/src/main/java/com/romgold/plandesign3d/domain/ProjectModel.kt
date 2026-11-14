@@ -48,7 +48,8 @@ data class ProjectDocument(
     val floorFinish: FinishMaterial = FinishMaterial("floor-neutral", "Нейтральный пол", FinishCategory.FLOOR, 0xFFE8E1D5, 1800.0),
     val wallFinish: FinishMaterial = FinishMaterial("wall-white", "Белая краска", FinishCategory.WALL, 0xFFF4F2EC, 650.0),
     val floorWastePercent: Double = 10.0,
-    val wallWastePercent: Double = 10.0
+    val wallWastePercent: Double = 10.0,
+    val surfaceLayout: SurfaceLayout = SurfaceLayout()
 ) {
     init {
         require(name.isNotBlank())
