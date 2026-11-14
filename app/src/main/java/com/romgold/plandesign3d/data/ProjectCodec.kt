@@ -25,7 +25,7 @@ object ProjectCodec {
         }
         fun material(m: FinishMaterial) = JSONObject().put("id", m.id).put("name", m.name)
             .put("category", m.category.name).put("color", m.colorArgb).put("price", m.pricePerSquareMetre)
-        return JSONObject().put("schemaVersion", 2).put("id", project.id).put("name", project.name)
+        return JSONObject().put("schemaVersion", 3).put("id", project.id).put("name", project.name)
             .put("walls", walls).put("openings", openings).put("furniture", furniture)
             .put("floorFinish", material(project.floorFinish)).put("wallFinish", material(project.wallFinish))
             .put("floorWaste", project.floorWastePercent).put("wallWaste", project.wallWastePercent)
