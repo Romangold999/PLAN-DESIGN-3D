@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
                                 EditorTab.OPENINGS -> OpeningEditor(project, change)
                                 EditorTab.FURNITURE -> FurnitureEditor(project, change)
                                 EditorTab.FINISHES -> FinishEditor(project, change)
-                                EditorTab.ESTIMATE -> EstimateEditor(project)
+                                EditorTab.ESTIMATE -> EstimateEditor(project, change)
                                 EditorTab.THREE_D -> Room3DView(project, Modifier.fillMaxWidth())
                                 EditorTab.SURFACE -> SurfaceLayoutEditor(project, change)
                                 EditorTab.ELEVATIONS -> WallElevationEditor(project)
@@ -440,169 +440,74 @@ private fun MaterialMenu(label: String, current: FinishMaterial, options: List<F
 }
 
 @Composable
-private fun EstimateEditor(project: ProjectDocument) {
+private fun EstimateEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
     val m = project.room.metrics()
     val floorQty = m.floorAreaM2 * (1 + project.floorWastePercent / 100.0)
     val wallQty = m.netWallAreaM2 * (1 + project.wallWastePercent / 100.0)
-    val floorCost = floorQty * project.floorFinish.pricePerSquareMetre
-    val wallCost = wallQty * project.wallFinish.pricePerSquareMetre
-    Text("Предварительный расчёт", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    Text("Расчёт количества материалов по геометрии. Цены ориентировочные и редактируются в каталоге.")
+    val floorMaterialCost = floorQty * project.floorFinish.pricePerSquareMetre
+    val wallMaterialCost = wallQty * project.wallFinish.pricePerSquareMetre
+    val rates = project.workRates
+    var floorRate by remember(rates.floorInstallationPerM2) { mutableStateOf(rates.floorInstallationPerM2.toInt().toString()) }
+    var prepRate by remember(rates.wallPreparationPerM2) { mutableStateOf(rates.wallPreparationPerM2.toInt().toString()) }
+    var wallRate by remember(rates.wallFinishingPerM2) { mutableStateOf(rates.wallFinishingPerM2.toInt().toString()) }
+    var ceilingRate by remember(rates.ceilingPerM2) { mutableStateOf(rates.ceilingPerM2.toInt().toString()) }
+    var electricalRate by remember(rates.electricalPoint) { mutableStateOf(rates.electricalPoint.toInt().toString()) }
+    var plumbingRate by remember(rates.plumbingPoint) { mutableStateOf(rates.plumbingPoint.toInt().toString()) }
+    val electricalCount = project.annotations.count { it.kind == AnnotationKind.SOCKET || it.kind == AnnotationKind.SWITCH || it.kind == AnnotationKind.LIGHT }
+    val plumbingCount = project.annotations.count { it.kind == AnnotationKind.WATER || it.kind == AnnotationKind.DRAIN }
+    val floorWork = m.floorAreaM2 * rates.floorInstallationPerM2
+    val wallPrep = m.netWallAreaM2 * rates.wallPreparationPerM2
+    val wallWork = m.netWallAreaM2 * rates.wallFinishingPerM2
+    val ceilingWork = m.floorAreaM2 * rates.ceilingPerM2
+    val electricalWork = electricalCount * rates.electricalPoint
+    val plumbingWork = plumbingCount * rates.plumbingPoint
+    val workTotal = floorWork + wallPrep + wallWork + ceilingWork + electricalWork + plumbingWork
+    val total = floorMaterialCost + wallMaterialCost + workTotal
+
+    Text("Предварительная смета", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("Материалы и ориентировочная стоимость работ. Все расценки можно изменить под свой регион и подрядчика.")
     EstimateLine("Площадь пола", "%.2f м²".format(m.floorAreaM2))
     EstimateLine("Периметр", "%.2f м".format(m.perimeterM))
     EstimateLine("Площадь стен до вычета проёмов", "%.2f м²".format(m.grossWallAreaM2))
     EstimateLine("Площадь дверей и окон", "%.2f м²".format(m.openingsAreaM2))
     EstimateLine("Чистая площадь стен", "%.2f м²".format(m.netWallAreaM2))
     Divider()
+    Text("Материалы", fontWeight = FontWeight.Bold)
     EstimateLine(project.floorFinish.name + " с запасом", "%.2f м²".format(floorQty))
-    EstimateLine("Стоимость пола", "%.0f ₽".format(floorCost))
+    EstimateLine("Материал пола", "%.0f ₽".format(floorMaterialCost))
     EstimateLine(project.wallFinish.name + " с запасом", "%.2f м²".format(wallQty))
-    EstimateLine("Стоимость стен", "%.0f ₽".format(wallCost))
+    EstimateLine("Материал стен", "%.0f ₽".format(wallMaterialCost))
+    Divider()
+    Text("Расценки работ • ₽ за единицу", fontWeight = FontWeight.Bold)
+    NumberInput("Монтаж пола ₽/м²", floorRate, { floorRate = it })
+    NumberInput("Подготовка стен ₽/м²", prepRate, { prepRate = it })
+    NumberInput("Отделка стен ₽/м²", wallRate, { wallRate = it })
+    NumberInput("Потолок ₽/м²", ceilingRate, { ceilingRate = it })
+    NumberInput("Электроточка ₽/шт.", electricalRate, { electricalRate = it })
+    NumberInput("Сантехническая точка ₽/шт.", plumbingRate, { plumbingRate = it })
+    Button(onClick = {
+        val newRates = runCatching {
+            WorkRates(floorRate.toDouble(), prepRate.toDouble(), wallRate.toDouble(), ceilingRate.toDouble(),
+                electricalRate.toDouble(), plumbingRate.toDouble())
+        }.getOrNull() ?: return@Button
+        change(project.copy(workRates = newRates))
+    }, modifier = Modifier.fillMaxWidth()) { Text("Сохранить расценки") }
+    Divider()
+    Text("Работы", fontWeight = FontWeight.Bold)
+    EstimateLine("Монтаж пола", "%.0f ₽".format(floorWork))
+    EstimateLine("Подготовка стен", "%.0f ₽".format(wallPrep))
+    EstimateLine("Отделка стен", "%.0f ₽".format(wallWork))
+    EstimateLine("Потолок", "%.0f ₽".format(ceilingWork))
+    EstimateLine("Электроточки (" + electricalCount + " шт.)", "%.0f ₽".format(electricalWork))
+    EstimateLine("Сантехнические точки (" + plumbingCount + " шт.)", "%.0f ₽".format(plumbingWork))
+    EstimateLine("Итого работы", "%.0f ₽".format(workTotal))
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("Итого по выбранным материалам", fontWeight = FontWeight.SemiBold)
-            Text("%.0f ₽".format(floorCost + wallCost), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text("Материалы + работы", fontWeight = FontWeight.SemiBold)
+            Text("%.0f ₽".format(total), fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }
     }
-    Text("Не включены работы, доставка, подготовка поверхностей, расходники и инженерные системы.", fontSize = 12.sp)
-}
-
-
-
-@Composable
-private fun SurfaceLayoutEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
-    val current = project.surfaceLayout
-    var width by remember(current.tileWidthMm) { mutableStateOf(current.tileWidthMm.toString()) }
-    var height by remember(current.tileHeightMm) { mutableStateOf(current.tileHeightMm.toString()) }
-    var grout by remember(current.groutMm) { mutableStateOf(current.groutMm.toString()) }
-    var waste by remember(current.wastePercent) { mutableStateOf(current.wastePercent.toInt().toString()) }
-    var pattern by remember(current.pattern) { mutableStateOf(current.pattern) }
-    Text("Раскладка плитки и покрытий", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    Text("Настройте формат элемента, ширину шва, направление и запас. Количество считается по площади.")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberInput("Ширина, мм", width, { width = it }, Modifier.weight(1f))
-        NumberInput("Длина, мм", height, { height = it }, Modifier.weight(1f))
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberInput("Шов, мм", grout, { grout = it }, Modifier.weight(1f))
-        NumberInput("Запас, %", waste, { waste = it }, Modifier.weight(1f))
-    }
-    Text("Схема раскладки", fontWeight = FontWeight.SemiBold)
-    SurfacePattern.values().forEach { option ->
-        FilterChip(selected = pattern == option, onClick = { pattern = option }, label = { Text(option.title) })
-    }
-    Button(onClick = {
-        val w = width.toIntOrNull() ?: return@Button
-        val h = height.toIntOrNull() ?: return@Button
-        val g = grout.toIntOrNull() ?: return@Button
-        val wasteValue = waste.toDoubleOrNull() ?: return@Button
-        val layout = runCatching { SurfaceLayout(w, h, g, current.rotationDegrees, wasteValue, pattern) }.getOrNull() ?: return@Button
-        change(project.copy(surfaceLayout = layout))
-    }, modifier = Modifier.fillMaxWidth()) { Text("Применить раскладку") }
-    val metrics = project.room.metrics()
-    val floorPieces = current.piecesForArea(metrics.floorAreaM2)
-    val wallPieces = current.piecesForArea(metrics.netWallAreaM2)
-    EstimateLine("Площадь пола", "%.2f м²".format(metrics.floorAreaM2))
-    EstimateLine("Элементов на пол с запасом", floorPieces.toString() + " шт.")
-    EstimateLine("Площадь стен", "%.2f м²".format(metrics.netWallAreaM2))
-    EstimateLine("Элементов на стены с запасом", wallPieces.toString() + " шт.")
-    Text("Расчёт количества ориентировочный: подрезка, рисунок и реальные размеры помещения могут изменить итог.")
-}
-
-@Composable
-private fun WallElevationEditor(project: ProjectDocument) {
-    var wallIndex by remember { mutableIntStateOf(0) }
-    var menu by remember { mutableStateOf(false) }
-    val wall = project.room.walls[wallIndex.coerceIn(project.room.walls.indices)]
-    val openings = project.room.openings.filter { it.wallIndex == wallIndex }
-    Text("Развёртки стен", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    Text("Фасад выбранной стены с точными проёмами и высотными отметками.")
-    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
-        OutlinedTextField(value = "Стена " + (wallIndex + 1), onValueChange = {}, readOnly = true,
-            label = { Text("Выбрать стену") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) },
-            modifier = Modifier.menuAnchor().fillMaxWidth())
-        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            project.room.walls.forEachIndexed { index, item ->
-                DropdownMenuItem(text = { Text("Стена " + (index + 1) + " • " + item.lengthMm.toInt() + " мм") },
-                    onClick = { wallIndex = index; menu = false })
-            }
-        }
-    }
-    Canvas(Modifier.fillMaxWidth().height(260.dp).background(Color(0xFFF0F2F2), RoundedCornerShape(12.dp)).padding(12.dp)) {
-        val scale = min((size.width - 32f) / wall.lengthMm.toFloat(), (size.height - 32f) / wall.heightMm.toFloat())
-        val wallWidth = wall.lengthMm.toFloat() * scale
-        val wallHeight = wall.heightMm * scale
-        val left = (size.width - wallWidth) / 2f
-        val top = (size.height - wallHeight) / 2f
-        drawRect(Color(project.wallFinish.colorArgb), Offset(left, top), Size(wallWidth, wallHeight))
-        drawRect(Color(0xFF315C78), Offset(left, top), Size(wallWidth, wallHeight), style = Stroke(3f))
-        openings.forEach { opening ->
-            val x = left + opening.offsetMm * scale
-            val h = opening.heightMm * scale
-            val y = top + (wall.heightMm - opening.sillHeightMm - opening.heightMm) * scale
-            val color = if (opening.type == OpeningType.WINDOW) Color(0xFF77C8DE) else Color(0xFFF0F2F2)
-            drawRect(color, Offset(x, y), Size(opening.widthMm * scale, h))
-            drawRect(Color(0xFF315C78), Offset(x, y), Size(opening.widthMm * scale, h), style = Stroke(2f))
-        }
-    }
-    EstimateLine("Длина стены", wall.lengthMm.toInt().toString() + " мм")
-    EstimateLine("Высота стены", wall.heightMm.toString() + " мм")
-    EstimateLine("Толщина", wall.thicknessMm.toString() + " мм")
-    EstimateLine("Проёмов", openings.size.toString())
-    openings.forEachIndexed { index, opening ->
-        Text((index + 1).toString() + ". " + (if (opening.type == OpeningType.DOOR) "Дверь" else "Окно") +
-            " • отступ " + opening.offsetMm + " мм • " + opening.widthMm + "×" + opening.heightMm + " мм")
-    }
-}
-
-
-@Composable
-private fun EngineeringEditor(project: ProjectDocument, change: (ProjectDocument) -> Unit) {
-    var kind by remember { mutableStateOf(AnnotationKind.SOCKET) }
-    var x by remember { mutableStateOf("500") }
-    var y by remember { mutableStateOf("500") }
-    var label by remember { mutableStateOf("") }
-    var menu by remember { mutableStateOf(false) }
-    Text("Инженерные схемы", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    Text("Добавляйте точки электрики, освещения, водоснабжения, канализации и вентиляции. Символы отображаются поверх 2D-плана.")
-    ExposedDropdownMenuBox(expanded = menu, onExpandedChange = { menu = it }) {
-        OutlinedTextField(value = kind.title, onValueChange = {}, readOnly = true, label = { Text("Тип точки") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(menu) }, modifier = Modifier.menuAnchor().fillMaxWidth())
-        ExposedDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-            AnnotationKind.values().forEach { option ->
-                DropdownMenuItem(text = { Text(option.title) }, onClick = { kind = option; menu = false })
-            }
-        }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        NumberInput("X, мм", x, { x = it }, Modifier.weight(1f))
-        NumberInput("Y, мм", y, { y = it }, Modifier.weight(1f))
-    }
-    OutlinedTextField(value = label, onValueChange = { label = it.take(40) }, label = { Text("Подпись (необязательно)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-    Button(onClick = {
-        val px = x.toIntOrNull() ?: return@Button
-        val py = y.toIntOrNull() ?: return@Button
-        val annotation = runCatching { PlanAnnotation(UUID.randomUUID().toString(), kind, px, py, label) }.getOrNull() ?: return@Button
-        val updated = runCatching { project.copy(annotations = project.annotations + annotation) }.getOrNull() ?: return@Button
-        change(updated)
-    }, modifier = Modifier.fillMaxWidth()) { Text("Добавить точку на план") }
-    Text("Точки проекта: " + project.annotations.size, fontWeight = FontWeight.Bold)
-    project.annotations.forEach { item ->
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(item.kind.title + " • X " + item.xMm + " • Y " + item.yMm, Modifier.weight(1f))
-            TextButton(onClick = { change(project.copy(annotations = project.annotations.filterNot { it.id == item.id })) }) { Text("Удалить") }
-        }
-    }
-}
-
-@Composable
-private fun ExportEditor(project: ProjectDocument, onSvg: () -> Unit, onJson: () -> Unit, onImport: () -> Unit) {
-    Text("Экспорт проекта", fontSize = 21.sp, fontWeight = FontWeight.Bold)
-    Text("SVG содержит план помещения, стены, проёмы и мебель. JSON сохраняет редактируемую модель проекта для повторного открытия и будущего импорта.")
-    Button(onClick = onSvg, modifier = Modifier.fillMaxWidth()) { Text("Сохранить чертёж SVG") }
-    OutlinedButton(onClick = onJson, modifier = Modifier.fillMaxWidth()) { Text("Сохранить проект JSON") }
-    OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth()) { Text("Импортировать проект JSON") }
-    Text("SVG — чертёж для просмотра и печати. JSON — полный редактируемый проект, который можно импортировать обратно.")
+    Text("Оценка не является договорной сметой. Не включены доставка, демонтаж, расходники, налоги и непредусмотренные работы.", fontSize = 12.sp)
 }
 
 @Composable
