@@ -4,6 +4,8 @@ package com.romgold.plandesign3d
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -22,17 +24,20 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.romgold.plandesign3d.data.ProjectStore
+import com.romgold.plandesign3d.data.ProjectCodec
+import com.romgold.plandesign3d.data.ProjectSvgExporter
 import com.romgold.plandesign3d.domain.*
 import java.util.UUID
 import kotlin.math.min
 
 private enum class EditorTab(val title: String) {
-    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D")
+    PLAN("План"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), EXPORT("Экспорт")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,6 +46,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val store = ProjectStore(this)
         setContent {
+            val context = LocalContext.current
+            var pendingExport by remember { mutableStateOf("") }
+            val svgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/svg+xml")) { uri ->
+                if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
+            }
+            val jsonLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+                if (uri != null) context.contentResolver.openOutputStream(uri)?.use { it.write(pendingExport.toByteArray(Charsets.UTF_8)) }
+            }
             MaterialTheme(colorScheme = lightColorScheme(primary = Color(0xFF315C78), secondary = Color(0xFF668A78))) {
                 var project by remember {
                     mutableStateOf(store.loadLast() ?: ProjectDocument(UUID.randomUUID().toString(), "Мой проект", RoomPlan.rectangle(5000, 4000)))
@@ -49,6 +62,7 @@ class MainActivity : ComponentActivity() {
                 val undo = remember { mutableStateListOf<ProjectDocument>() }
                 val redo = remember { mutableStateListOf<ProjectDocument>() }
                 var saved by remember { mutableStateOf(true) }
+                var projectMenu by remember { mutableStateOf(false) }
 
                 val change: (ProjectDocument) -> Unit = { next ->
                     if (next != project) {
@@ -69,6 +83,21 @@ class MainActivity : ComponentActivity() {
                             Text(project.name, fontSize = 11.sp)
                         }
                     }, actions = {
+                        Box {
+                            TextButton(onClick = { projectMenu = true }) { Text("Проекты") }
+                            DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
+                                DropdownMenuItem(text = { Text("＋ Новый проект") }, onClick = {
+                                    project = ProjectDocument(UUID.randomUUID().toString(), "Новый проект", RoomPlan.rectangle(5000, 4000))
+                                    undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
+                                })
+                                Divider()
+                                store.list().forEach { savedProject ->
+                                    DropdownMenuItem(text = { Text(savedProject.name) }, onClick = {
+                                        project = savedProject; undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
+                                    })
+                                }
+                            }
+                        }
                         TextButton(enabled = undo.isNotEmpty(), onClick = {
                             if (undo.isNotEmpty()) { redo.add(project); project = undo.removeAt(undo.lastIndex); saved = false }
                         }) { Text("↶") }
@@ -92,6 +121,11 @@ class MainActivity : ComponentActivity() {
                                 EditorTab.FINISHES -> FinishEditor(project, change)
                                 EditorTab.ESTIMATE -> EstimateEditor(project)
                                 EditorTab.THREE_D -> Room3DView(project, Modifier.fillMaxWidth())
+                                EditorTab.EXPORT -> ExportEditor(
+                                    project,
+                                    onSvg = { pendingExport = ProjectSvgExporter.encode(project); svgLauncher.launch(project.name + ".svg") },
+                                    onJson = { pendingExport = ProjectCodec.encode(project); jsonLauncher.launch(project.name + ".json") }
+                                )
                             }
                             Text(if (saved) "Автосохранение включено • офлайн" else "Есть несохранённые изменения",
                                 color = if (saved) Color(0xFF28734A) else MaterialTheme.colorScheme.primary, fontSize = 12.sp)
@@ -109,7 +143,10 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
     var depthText by remember(project.room.boundsDepthMm) { mutableStateOf(project.room.boundsDepthMm.toString()) }
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
+    var projectName by remember(project.id, project.name) { mutableStateOf(project.name) }
     Text("План помещения", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    OutlinedTextField(value = projectName, onValueChange = { projectName = it }, label = { Text("Название проекта") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedButton(onClick = { if (projectName.isNotBlank()) change(project.copy(name = projectName.trim())) }, modifier = Modifier.fillMaxWidth()) { Text("Переименовать проект") }
     Text("Все размеры хранятся в миллиметрах. Масштабирование не меняет исходную геометрию.")
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         NumberInput("Ширина, мм", widthText, { widthText = it }, Modifier.weight(1f))
@@ -340,6 +377,16 @@ private fun EstimateEditor(project: ProjectDocument) {
         }
     }
     Text("Не включены работы, доставка, подготовка поверхностей, расходники и инженерные системы.", fontSize = 12.sp)
+}
+
+
+@Composable
+private fun ExportEditor(project: ProjectDocument, onSvg: () -> Unit, onJson: () -> Unit) {
+    Text("Экспорт проекта", fontSize = 21.sp, fontWeight = FontWeight.Bold)
+    Text("SVG содержит план помещения, стены, проёмы и мебель. JSON сохраняет редактируемую модель проекта для повторного открытия и будущего импорта.")
+    Button(onClick = onSvg, modifier = Modifier.fillMaxWidth()) { Text("Сохранить чертёж SVG") }
+    OutlinedButton(onClick = onJson, modifier = Modifier.fillMaxWidth()) { Text("Сохранить проект JSON") }
+    Text("Экспорт выполняется через системный диалог сохранения Android.")
 }
 
 @Composable
