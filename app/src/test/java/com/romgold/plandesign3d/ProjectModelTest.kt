@@ -21,6 +21,11 @@ class ProjectModelTest {
         assertEquals(metrics.grossWallAreaM2 - 1.89, metrics.netWallAreaM2, 0.001)
     }
 
+    @Test fun surfaceLayoutCalculatesTileCountWithWaste() {
+        val layout = SurfaceLayout(tileWidthMm = 600, tileHeightMm = 600, wastePercent = 10.0)
+        assertEquals(62, layout.piecesForArea(20.0))
+    }
+
     @Test fun furnitureHasMillimetreDimensionsAndQuarterTurnRotation() {
         val item = FurnitureItem("bed-1", FurnitureKind.BED, 100, 200, rotationDegrees = 90)
         assertEquals(1600, item.widthMm)
