@@ -122,6 +122,33 @@ private fun PlanEditor(project: ProjectDocument, change: (ProjectDocument) -> Un
         zoom = 1f
         pan = Offset.Zero
     }, modifier = Modifier.fillMaxWidth()) { Text("Применить размеры") }
+
+    var pointX by remember { mutableStateOf("0") }
+    var pointY by remember { mutableStateOf("0") }
+    var vertices by remember(project.room) { mutableStateOf(project.room.walls.map { it.start }) }
+    Text("Нестандартная геометрия", fontWeight = FontWeight.Bold)
+    Text("Задайте углы помещения координатами X/Y в миллиметрах. Точки соединяются по порядку и автоматически замыкаются.")
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NumberInput("X, мм", pointX, { pointX = it }, Modifier.weight(1f))
+        NumberInput("Y, мм", pointY, { pointY = it }, Modifier.weight(1f))
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = {
+            val x = pointX.toIntOrNull() ?: return@OutlinedButton
+            val y = pointY.toIntOrNull() ?: return@OutlinedButton
+            val point = Point2(x, y)
+            if (point !in vertices) vertices = vertices + point
+        }, modifier = Modifier.weight(1f)) { Text("Добавить угол") }
+        OutlinedButton(onClick = { if (vertices.isNotEmpty()) vertices = vertices.dropLast(1) },
+            enabled = vertices.isNotEmpty(), modifier = Modifier.weight(1f)) { Text("Убрать последний") }
+    }
+    Text("Вершины: " + vertices.joinToString("  →  ") { "(" + it.xMm + "; " + it.yMm + ")" }, fontSize = 12.sp)
+    Button(onClick = {
+        val shape = runCatching { RoomPlan.fromPoints(vertices, project.room.walls.first().thicknessMm, project.room.walls.first().heightMm) }.getOrNull()
+            ?: return@Button
+        change(project.copy(room = shape, furniture = emptyList()))
+    }, enabled = vertices.size >= 3, modifier = Modifier.fillMaxWidth()) { Text("Построить помещение по контуру") }
+
     Box(Modifier.fillMaxWidth().height(300.dp).background(Color(0xFFF0F2F2), RoundedCornerShape(16.dp)).padding(8.dp)) {
         Canvas(Modifier.fillMaxSize().pointerInput(project.room) {
             detectTransformGestures { _, delta, zoomDelta, _ ->
