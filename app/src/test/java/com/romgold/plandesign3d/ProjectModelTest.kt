@@ -47,4 +47,24 @@ class ProjectModelTest {
         assertEquals(2000, item.depthMm)
         assertTrue(item.rotationDegrees % 90 == 0)
     }
+    @Test fun narrowFurniturePassagesReportClearanceAndIgnoreOverlaps() {
+        val sofa = FurnitureItem("sofa", FurnitureKind.SOFA, 0, 0, widthMm = 2000, depthMm = 900)
+        val table = FurnitureItem("table", FurnitureKind.TABLE, 2500, 0, widthMm = 1000, depthMm = 700)
+        val bed = FurnitureItem("bed", FurnitureKind.BED, 1000, 200, widthMm = 1600, depthMm = 2000)
+        val results = findNarrowFurniturePassages(listOf(sofa, table, bed), 600)
+        assertEquals(1, results.size)
+        assertEquals(500, results.first().distanceMm)
+        assertEquals("sofa", results.first().first.id)
+        assertEquals("table", results.first().second.id)
+    }
+
+    @Test fun rotatedFurnitureUsesSwappedDimensionsForClearance() {
+        val first = FurnitureItem("first", FurnitureKind.TABLE, 0, 0, widthMm = 1200, depthMm = 600)
+        val rotated = FurnitureItem("rotated", FurnitureKind.TABLE, 0, 1800,
+            widthMm = 1200, depthMm = 600, rotationDegrees = 90)
+        val results = findNarrowFurniturePassages(listOf(first, rotated), 700)
+        assertEquals(1, results.size)
+        assertEquals(0, results.first().distanceMm)
+    }
+
 }
