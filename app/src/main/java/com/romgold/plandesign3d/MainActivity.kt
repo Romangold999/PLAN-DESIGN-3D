@@ -649,15 +649,47 @@ private fun OpeningEditor(project: ProjectDocument, change: (ProjectDocument) ->
     }, modifier = Modifier.fillMaxWidth()) { Text("Добавить проём") }
     Text("Проёмы проекта: " + project.room.openings.size, fontWeight = FontWeight.Bold)
     project.room.openings.forEachIndexed { i, item ->
-        Card {
-            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
+        key(i, item) {
+            var editing by remember(item) { mutableStateOf(false) }
+            var editWall by remember(item) { mutableStateOf(item.wallIndex.toString()) }
+            var editOffset by remember(item) { mutableStateOf(item.offsetMm.toString()) }
+            var editWidth by remember(item) { mutableStateOf(item.widthMm.toString()) }
+            var editHeight by remember(item) { mutableStateOf(item.heightMm.toString()) }
+            var editSill by remember(item) { mutableStateOf(item.sillHeightMm.toString()) }
+            Card {
+                Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text((if (item.type == OpeningType.DOOR) "Дверь" else "Окно") + " • стена " + (item.wallIndex + 1), fontWeight = FontWeight.SemiBold)
                     Text(item.widthMm.toString() + " × " + item.heightMm + " мм • отступ " + item.offsetMm + " мм")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { editing = !editing }) { Text(if (editing) "Отмена" else "Изменить") }
+                        TextButton(onClick = {
+                            change(project.copy(room = RoomPlan(project.room.walls, project.room.openings.filterIndexed { index, _ -> index != i })))
+                        }) { Text("Удалить") }
+                    }
+                    if (editing) {
+                        NumberInput("Номер стены (начиная с 1)", editWall, { editWall = it })
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NumberInput("Отступ, мм", editOffset, { editOffset = it }, Modifier.weight(1f))
+                            NumberInput("Ширина, мм", editWidth, { editWidth = it }, Modifier.weight(1f))
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            NumberInput("Высота, мм", editHeight, { editHeight = it }, Modifier.weight(1f))
+                            NumberInput("Подоконник, мм", editSill, { editSill = it }, Modifier.weight(1f))
+                        }
+                        Button(onClick = {
+                            val wallIndex = (editWall.toIntOrNull() ?: 0) - 1
+                            val offsetMm = editOffset.toIntOrNull() ?: return@Button
+                            val widthMm = editWidth.toIntOrNull() ?: return@Button
+                            val heightMm = editHeight.toIntOrNull() ?: return@Button
+                            val sillMm = editSill.toIntOrNull() ?: return@Button
+                            val replacement = runCatching { Opening(wallIndex, offsetMm, widthMm, heightMm, sillMm, item.type) }.getOrNull() ?: return@Button
+                            val openings = project.room.openings.toMutableList().also { it[i] = replacement }
+                            val room = runCatching { RoomPlan(project.room.walls, openings) }.getOrNull() ?: return@Button
+                            change(project.copy(room = room))
+                            editing = false
+                        }, modifier = Modifier.fillMaxWidth()) { Text("Сохранить изменения") }
+                    }
                 }
-                TextButton(onClick = {
-                    change(project.copy(room = RoomPlan(project.room.walls, project.room.openings.filterIndexed { index, _ -> index != i })))
-                }) { Text("Удалить") }
             }
         }
     }
