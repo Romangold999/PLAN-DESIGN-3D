@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import com.romgold.plandesign3d.data.ModelingDocumentStore
 import com.romgold.plandesign3d.domain.*
 import java.util.UUID
 import kotlin.math.cos
@@ -31,10 +33,16 @@ private val CadAccent = Color(0xFF4EA3D8)
 
 @Composable
 fun BlenderWorkspace() {
-    val objects = remember {
-        mutableStateListOf(SceneObject(UUID.randomUUID().toString(), "Cube", MeshData.cube()))
+    val context = LocalContext.current
+    val store = remember(context) { ModelingDocumentStore(context) }
+    val initialScene = remember(store) {
+        store.loadScene() ?: BlenderSceneDocument(UUID.randomUUID().toString(), "Scene", listOf(SceneObject(UUID.randomUUID().toString(), "Cube", MeshData.cube())))
     }
-    var selectedId by remember { mutableStateOf(objects.first().id) }
+    val objects = remember(initialScene) {
+        mutableStateListOf<SceneObject>().apply { addAll(initialScene.objects) }
+    }
+    LaunchedEffect(objects.toList()) { store.saveScene(initialScene.copy(objects = objects.toList())) }
+    var selectedId by remember { mutableStateOf(objects.firstOrNull()?.id.orEmpty()) }
     var rotation by remember { mutableFloatStateOf(0f) }
     val selected = objects.firstOrNull { it.id == selectedId }
 
@@ -123,7 +131,10 @@ fun BlenderWorkspace() {
 
 @Composable
 fun FreeCADWorkspace() {
-    var sketch by remember { mutableStateOf(FreeCADSketchDocument(UUID.randomUUID().toString(), "Sketch")) }
+    val context = LocalContext.current
+    val store = remember(context) { ModelingDocumentStore(context) }
+    var sketch by remember(store) { mutableStateOf(store.loadSketch() ?: FreeCADSketchDocument(UUID.randomUUID().toString(), "Sketch")) }
+    LaunchedEffect(sketch) { store.saveSketch(sketch) }
     var selectedIndex by remember { mutableIntStateOf(-1) }
     Column(Modifier.fillMaxSize().background(CadBackground).padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
