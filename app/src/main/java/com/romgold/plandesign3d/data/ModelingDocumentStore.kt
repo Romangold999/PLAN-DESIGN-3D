@@ -9,10 +9,18 @@ import java.io.DataOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /** Local binary persistence for the editable Blender scene and FreeCAD sketch documents. */
 class ModelingDocumentStore(context: Context) {
-    private val directory = File(context.filesDir, "modeling-documents").apply { mkdirs() }
+    private val directory = File(context.filesDir, "modeling-documents").apply {
+        if (!exists() && !mkdirs()) error("Cannot create modeling documents directory")
+        check(isDirectory) { "Modeling documents path is not a directory" }
+    }
+    var lastLoadError: String? = null
+        private set
     private val sceneFile = File(directory, "blender-scene.pd3d")
     private val sketchFile = File(directory, "freecad-sketch.pd3d")
 
@@ -104,18 +112,36 @@ class ModelingDocumentStore(context: Context) {
         }
     }
 
-    private fun <T> read(file: File, block: (DataInputStream) -> T): T? = runCatching {
-        DataInputStream(BufferedInputStream(FileInputStream(file))).use(block)
-    }.getOrNull()
+    private fun <T> read(file: File, block: (DataInputStream) -> T): T? {
+        if (!file.exists()) {
+            lastLoadError = null
+            return null
+        }
+        return try {
+            DataInputStream(BufferedInputStream(FileInputStream(file))).use(block).also {
+                lastLoadError = null
+            }
+        } catch (error: Exception) {
+            lastLoadError = "Не удалось прочитать ${file.name}: ${error.localizedMessage ?: error.javaClass.simpleName}"
+            null
+        }
+    }
 
     private fun write(file: File, block: (DataOutputStream) -> Unit) {
-        runCatching {
-            val temp = File(directory, file.name + ".tmp")
-            DataOutputStream(BufferedOutputStream(FileOutputStream(temp))).use(block)
-            if (!temp.renameTo(file)) {
-                file.delete()
-                check(temp.renameTo(file)) { "Unable to replace modeling document" }
+        val temp = File(directory, file.name + ".tmp")
+        try {
+            DataOutputStream(BufferedOutputStream(FileOutputStream(temp))).use { output ->
+                block(output)
+                output.flush()
             }
+            try {
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+        } catch (error: Exception) {
+            temp.delete()
+            throw IllegalStateException("Не удалось сохранить ${file.name}: ${error.localizedMessage ?: error.javaClass.simpleName}", error)
         }
     }
 
