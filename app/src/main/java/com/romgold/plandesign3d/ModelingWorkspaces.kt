@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import com.romgold.plandesign3d.data.ModelingDocumentStore
 import com.romgold.plandesign3d.domain.*
@@ -211,38 +212,76 @@ fun FreeCADWorkspace() {
             }) { Text("Delete") }
         }
         Text("Sketch geometry", color = Color(0xFFCBD4DC), fontSize = 12.sp)
-        Canvas(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF171C21), RoundedCornerShape(6.dp)).pointerInput(drawingMode, sketch.geometry.size) {
-            var dragStart: Offset? = null
-            var dragEnd: Offset? = null
-            detectDragGestures(
-                onDragStart = { dragStart = it; dragEnd = it },
-                onDrag = { change, _ -> dragEnd = change.position },
-                onDragEnd = {
-                    val start = dragStart
-                    val end = dragEnd
-                    if (drawingMode != "Select" && start != null && end != null) {
-                        val unit = size.minDimension / 240f
-                        val origin = Offset(size.width / 2f, size.height / 2f)
-                        val worldStart = Vector3((start.x - origin.x) / unit.toDouble(), (origin.y - start.y) / unit.toDouble(), 0.0)
-                        val worldEnd = Vector3((end.x - origin.x) / unit.toDouble(), (origin.y - end.y) / unit.toDouble(), 0.0)
-                        val created: SketchGeometry? = when (drawingMode) {
-                            "Line" -> if (worldStart != worldEnd) SketchGeometry.Segment(worldStart, worldEnd) else null
-                            "Circle" -> {
-                                val radius = kotlin.math.hypot((end.x - start.x).toDouble(), (end.y - start.y).toDouble()) / unit
-                                if (radius > 0.5) SketchGeometry.Circle(worldStart, radius) else null
+        Canvas(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF171C21), RoundedCornerShape(6.dp))
+            .pointerInput(drawingMode, sketch.geometry, selectedIndex) {
+                var dragStart: Offset? = null
+                var dragEnd: Offset? = null
+                detectDragGestures(
+                    onDragStart = { dragStart = it; dragEnd = it },
+                    onDrag = { change, _ -> dragEnd = change.position },
+                    onDragEnd = {
+                        val start = dragStart
+                        val end = dragEnd
+                        if (start != null && end != null) {
+                            val unit = minOf(size.width, size.height) / 240f
+                            val origin = Offset(size.width / 2f, size.height / 2f)
+                            if (drawingMode == "Select" && selectedIndex in sketch.geometry.indices) {
+                                val dx = (end.x - start.x) / unit
+                                val dy = (start.y - end.y) / unit
+                                val moved = when (val item = sketch.geometry[selectedIndex]) {
+                                    is SketchGeometry.Segment -> item.copy(
+                                        start = item.start.copy(x = item.start.x + dx, y = item.start.y + dy),
+                                        end = item.end.copy(x = item.end.x + dx, y = item.end.y + dy)
+                                    )
+                                    is SketchGeometry.Circle -> item.copy(center = item.center.copy(x = item.center.x + dx, y = item.center.y + dy))
+                                }
+                                sketch = sketch.copy(geometry = sketch.geometry.toMutableList().also { it[selectedIndex] = moved })
+                            } else if (drawingMode != "Select") {
+                                val worldStart = Vector3((start.x - origin.x) / unit, (origin.y - start.y) / unit, 0.0)
+                                val worldEnd = Vector3((end.x - origin.x) / unit, (origin.y - end.y) / unit, 0.0)
+                                val created: SketchGeometry? = when (drawingMode) {
+                                    "Line" -> if (worldStart != worldEnd) SketchGeometry.Segment(worldStart, worldEnd) else null
+                                    "Circle" -> {
+                                        val radius = kotlin.math.hypot((end.x - start.x).toDouble(), (end.y - start.y).toDouble()) / unit.toDouble()
+                                        if (radius > 0.5) SketchGeometry.Circle(worldStart, radius) else null
+                                    }
+                                    else -> null
+                                }
+                                if (created != null) {
+                                    sketch = sketch.copy(geometry = sketch.geometry + created)
+                                    selectedIndex = sketch.geometry.lastIndex
+                                }
                             }
-                            else -> null
                         }
-                        if (created != null) {
-                            sketch = sketch.copy(geometry = sketch.geometry + created)
-                            selectedIndex = sketch.geometry.lastIndex
-                        }
+                        dragStart = null
+                        dragEnd = null
                     }
-                    dragStart = null
-                    dragEnd = null
+                )
+            }
+            .pointerInput(drawingMode, sketch.geometry) {
+                detectTapGestures { tap ->
+                    if (drawingMode == "Select") {
+                        val unit = minOf(size.width, size.height) / 240f
+                        val origin = Offset(size.width / 2f, size.height / 2f)
+                        fun screen(point: Vector3) = Offset(origin.x + point.x.toFloat() * unit, origin.y - point.y.toFloat() * unit)
+                        fun segmentDistance(point: Offset, a: Offset, b: Offset): Float {
+                            val dx = b.x - a.x
+                            val dy = b.y - a.y
+                            val length2 = dx * dx + dy * dy
+                            val t = if (length2 == 0f) 0f else (((point.x - a.x) * dx + (point.y - a.y) * dy) / length2).coerceIn(0f, 1f)
+                            return kotlin.math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy))
+                        }
+                        val nearest = sketch.geometry.mapIndexed { index, item ->
+                            val distance = when (item) {
+                                is SketchGeometry.Segment -> segmentDistance(tap, screen(item.start), screen(item.end))
+                                is SketchGeometry.Circle -> kotlin.math.abs(kotlin.math.hypot(tap.x - screen(item.center).x, tap.y - screen(item.center).y) - item.radius.toFloat() * unit)
+                            }
+                            index to distance
+                        }.minByOrNull { it.second }
+                        selectedIndex = nearest?.takeIf { it.second <= 24f }?.first ?: -1
+                    }
                 }
-            )
-        }) {
+            }) {
             val unit = size.minDimension / 240f
             val origin = Offset(size.width / 2f, size.height / 2f)
             var x = origin.x % (unit * 10f)
