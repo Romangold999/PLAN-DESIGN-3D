@@ -73,10 +73,13 @@ fun BlenderWorkspace() {
                         val mesh = item.mesh
                         val angle = Math.toRadians(rotation.toDouble())
                         val points = mesh.vertices.map { vertex ->
-                            val x = vertex.x * cos(angle) - vertex.z * sin(angle)
-                            val z = vertex.x * sin(angle) + vertex.z * cos(angle)
+                            val localX = vertex.x + item.transform.location.x
+                            val localY = vertex.y + item.transform.location.y
+                            val localZ = vertex.z + item.transform.location.z
+                            val x = localX * cos(angle) - localZ * sin(angle)
+                            val z = localX * sin(angle) + localZ * cos(angle)
                             val isoX = (x - z) * 0.72
-                            val isoY = (x + z) * 0.36 - vertex.y * 0.82
+                            val isoY = (x + z) * 0.36 - localY * 0.82
                             Offset(size.width / 2f + isoX.toFloat() * size.minDimension * 0.23f, size.height / 2f - isoY.toFloat() * size.minDimension * 0.23f)
                         }
                         val faceColors = listOf(Color(0xFF59636F), Color(0xFF778492), Color(0xFF65717D), Color(0xFF8794A0), Color(0xFF4C5661), Color(0xFF6B7784))
@@ -89,8 +92,6 @@ fun BlenderWorkspace() {
                             drawPath(path, faceColors[index % faceColors.size])
                             drawPath(path, BlenderAccent, style = Stroke(width = 1.8f))
                         }
-                    } else {
-                        drawContext.canvas.nativeCanvas.let { }
                     }
                 }
                 Text("Орбита: ${rotation.toInt()}°", color = Color(0xFFB8BBC0), fontSize = 11.sp)
