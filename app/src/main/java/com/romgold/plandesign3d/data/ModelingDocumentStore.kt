@@ -46,7 +46,7 @@ class ModelingDocumentStore(context: Context) {
                 output.writeUTF(item.id)
                 output.writeUTF(item.name)
                 output.writeInt(item.mesh.vertices.size)
-                item.mesh.vertices.forEach(output::writeVector)
+                item.mesh.vertices.forEach { output.writeVector(it) }
                 output.writeInt(item.mesh.faces.size)
                 item.mesh.faces.forEach { face ->
                     output.writeInt(face.size)
