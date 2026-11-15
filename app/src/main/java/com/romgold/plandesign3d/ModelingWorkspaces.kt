@@ -68,8 +68,7 @@ fun BlenderWorkspace() {
                     while (gx < size.width) { drawLine(Color(0xFF3B3E44), Offset(gx, 0f), Offset(gx, size.height), 1f); gx += step }
                     var gy = 0f
                     while (gy < size.height) { drawLine(Color(0xFF3B3E44), Offset(0f, gy), Offset(size.width, gy), 1f); gy += step }
-                    val item = objects.firstOrNull { it.id == selectedId }
-                    if (item != null) {
+                    objects.firstOrNull { it.id == selectedId }?.let { item ->
                         val mesh = item.mesh
                         val angle = Math.toRadians(rotation.toDouble())
                         val points = mesh.vertices.map { vertex ->
