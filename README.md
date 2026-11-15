@@ -1,31 +1,26 @@
-# PLAN DESIGN 3D
+# Blender + FreeCAD for Android
 
-Android project for adapting **Blender and FreeCAD** workflows to a touchscreen device.
+Public Android project: a touchscreen-oriented workspace for two applications only:
+- **Blender** — 3D scene and mesh workflows.
+- **FreeCAD** — parametric CAD and sketch workflows.
 
-## Agreed product scope
+No third application, plugins, extensions, room planning, renovation tools, construction estimates, finish catalogues or unrelated custom modules are included.
 
-- Blender for 3D content creation and modeling.
-- FreeCAD for parametric CAD and technical design.
-- Two distinct workspaces with recognizable original-app interaction patterns, adapted for Android touch input.
+## Current implementation status
 
-There are **no third applications, plugins, extensions, renovation modules, room-planning features, estimates or custom feature packs** in the agreed product scope.
+The launcher contains two workspaces. The legacy room-planning screens, data models, exporters, tests and the unused SceneView dependency have been removed from the active source tree.
 
-## Current state
+This is an early native Android prototype, **not** a port of the full Blender or FreeCAD desktop applications. Current scene/sketch controls are limited; geometric constraint solving, full 3D transform manipulation, native .blend/.FCStd import/export, undo/redo and broad workbench coverage are not yet implemented. Do not treat visual controls as proof of feature parity.
 
-The repository currently contains an earlier room-planning prototype. It is **not yet** a Blender/FreeCAD mobile implementation. The existing room geometry, furniture, finishes, estimates, engineering annotations and room preview are legacy prototype functionality and must not be treated as completed target features.
+## Engineering rules
 
-The latest CI build is a technical checkpoint only. Work is proceeding by auditing and replacing the prototype with verified Blender and FreeCAD workflows. Existing code should be removed only after a replacement is implemented and tested.
-
-## Development rules
-
-- Do not present placeholder controls as working tools.
-- Do not claim native .blend, FreeCAD .FCStd, mesh or CAD format support until import/export round-trip tests pass.
-- Keep Blender and FreeCAD workflows distinct.
+- Keep Blender and FreeCAD workflows visually and functionally distinct.
+- Implement real document operations before presenting tools as functional.
+- Persist and test edits across app restarts.
+- Do not claim native format compatibility until round-trip tests pass.
 - Run unit tests and Android builds after each coherent change.
-- A successful CI build does not replace testing on the target Android device.
-
-See [PRODUCT_SCOPE.md](docs/PRODUCT_SCOPE.md) for migration boundaries and release gates.
+- CI success does not replace installation and testing on the Unihertz Tank 2.
 
 ## Build
 
-The Android debug APK is built by GitHub Actions. Open the latest successful workflow run and download the `plan-design-3d-debug-apk` artifact.
+GitHub Actions builds a debug APK. Open the latest successful workflow run and download the `plan-design-3d-debug-apk` artifact.
