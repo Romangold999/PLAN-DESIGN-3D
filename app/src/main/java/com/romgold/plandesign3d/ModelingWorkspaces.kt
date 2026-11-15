@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.platform.LocalContext
 import com.romgold.plandesign3d.data.ModelingDocumentStore
 import com.romgold.plandesign3d.domain.*
@@ -44,6 +46,8 @@ fun BlenderWorkspace() {
     LaunchedEffect(objects.toList()) { store.saveScene(initialScene.copy(objects = objects.toList())) }
     var selectedId by remember { mutableStateOf(objects.firstOrNull()?.id.orEmpty()) }
     var rotation by remember { mutableFloatStateOf(0f) }
+    var pitch by remember { mutableFloatStateOf(25f) }
+    var cameraZoom by remember { mutableFloatStateOf(1f) }
     val selected = objects.firstOrNull { it.id == selectedId }
 
     Column(Modifier.fillMaxSize().background(BlenderBackground).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -70,7 +74,13 @@ fun BlenderWorkspace() {
         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("3D Viewport", color = Color(0xFFD9DDE1), fontSize = 12.sp)
-                Canvas(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF303238), RoundedCornerShape(6.dp))) {
+                Canvas(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF303238), RoundedCornerShape(6.dp)).pointerInput(Unit) {
+                    detectTransformGestures { _, pan, zoomChange, _ ->
+                        rotation = (rotation + pan.x * 0.6f) % 360f
+                        pitch = (pitch + pan.y * 0.6f).coerceIn(-89f, 89f)
+                        cameraZoom = (cameraZoom * zoomChange).coerceIn(0.35f, 4f)
+                    }
+                }) {
                     val step = 28f
                     var gx = 0f
                     while (gx < size.width) { drawLine(Color(0xFF3B3E44), Offset(gx, 0f), Offset(gx, size.height), 1f); gx += step }
@@ -97,11 +107,15 @@ fun BlenderWorkspace() {
                             val objectX = rotatedX * cz - rotatedY * sz + item.transform.location.x
                             val objectY = rotatedX * sz + rotatedY * cz + item.transform.location.y
                             val objectZ = depthZ + item.transform.location.z
-                            val x = objectX * cos(viewAngle) - objectZ * sin(viewAngle)
-                            val z = objectX * sin(viewAngle) + objectZ * cos(viewAngle)
-                            val isoX = (x - z) * 0.72
-                            val isoY = (x + z) * 0.36 - objectY * 0.82
-                            Offset(size.width / 2f + isoX.toFloat() * size.minDimension * 0.23f, size.height / 2f - isoY.toFloat() * size.minDimension * 0.23f)
+                            val yawX = objectX * cos(viewAngle) - objectZ * sin(viewAngle)
+                            val yawZ = objectX * sin(viewAngle) + objectZ * cos(viewAngle)
+                            val pitchAngle = Math.toRadians(pitch.toDouble())
+                            val viewY = objectY * cos(pitchAngle) - yawZ * sin(pitchAngle)
+                            val viewZ = objectY * sin(pitchAngle) + yawZ * cos(pitchAngle)
+                            val isoX = (yawX - viewZ) * 0.72
+                            val isoY = (yawX + viewZ) * 0.36 - viewY * 0.82
+                            val scale = size.minDimension * 0.23f * cameraZoom
+                            Offset(size.width / 2f + isoX.toFloat() * scale, size.height / 2f - isoY.toFloat() * scale)
                         }
                         val faceColors = listOf(Color(0xFF59636F), Color(0xFF778492), Color(0xFF65717D), Color(0xFF8794A0), Color(0xFF4C5661), Color(0xFF6B7784))
                         mesh.faces.forEachIndexed { index, face ->
@@ -115,7 +129,7 @@ fun BlenderWorkspace() {
                         }
                     }
                 }
-                Text("Орбита: ${rotation.toInt()}°", color = Color(0xFFB8BBC0), fontSize = 11.sp)
+                Text("Орбита: X ${rotation.toInt()}°  Y ${pitch.toInt()}°  Масштаб ${"%.1f".format(cameraZoom)}×  •  Перетаскивание: орбита, щипок: масштаб", color = Color(0xFFB8BBC0), fontSize = 10.sp)
                 Slider(value = rotation, onValueChange = { rotation = it }, valueRange = 0f..360f)
             }
             Column(Modifier.width(112.dp).fillMaxHeight().background(BlenderPanel, RoundedCornerShape(6.dp)).padding(6.dp)) {
