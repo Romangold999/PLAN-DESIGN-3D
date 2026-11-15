@@ -45,7 +45,12 @@ fun BlenderWorkspace() {
     val objects = remember(initialScene) {
         mutableStateListOf<SceneObject>().apply { addAll(initialScene.objects) }
     }
-    LaunchedEffect(objects.toList()) { store.saveScene(initialScene.copy(objects = objects.toList())) }
+    var saveError by remember { mutableStateOf<String?>(store.lastLoadError) }
+    LaunchedEffect(objects.toList()) {
+        runCatching { store.saveScene(initialScene.copy(objects = objects.toList())) }
+            .onSuccess { saveError = null }
+            .onFailure { saveError = it.localizedMessage ?: "Ошибка сохранения сцены" }
+    }
     var selectedId by remember { mutableStateOf(objects.firstOrNull()?.id.orEmpty()) }
     var rotation by remember { mutableFloatStateOf(0f) }
     var pitch by remember { mutableFloatStateOf(25f) }
@@ -55,8 +60,9 @@ fun BlenderWorkspace() {
     Column(Modifier.fillMaxSize().background(BlenderBackground).padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("BLENDER  •  SCENE", color = Color.White, fontSize = 14.sp)
-            Text("Object Mode", color = Color(0xFFB8BBC0), fontSize = 12.sp)
+            Text(if (saveError == null) "Saved" else "Save error", color = if (saveError == null) Color(0xFF8BCB9B) else Color(0xFFFF8A80), fontSize = 12.sp)
         }
+        saveError?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 10.sp) }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(onClick = {
                 val name = "Cube.${(objects.size).toString().padStart(3, '0')}"
@@ -145,7 +151,8 @@ fun BlenderWorkspace() {
         }
         Text("Transform", color = Color.White, fontSize = 13.sp)
         if (selected != null) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            saveError?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 10.sp) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("X", "Y", "Z").forEachIndexed { axis, label ->
                     OutlinedButton(onClick = {
                         val p = selected.transform.location
@@ -194,13 +201,18 @@ fun FreeCADWorkspace() {
     val context = LocalContext.current
     val store = remember(context) { ModelingDocumentStore(context) }
     var sketch by remember(store) { mutableStateOf(store.loadSketch() ?: FreeCADSketchDocument(UUID.randomUUID().toString(), "Sketch")) }
-    LaunchedEffect(sketch) { store.saveSketch(sketch) }
+    var saveError by remember { mutableStateOf<String?>(store.lastLoadError) }
+    LaunchedEffect(sketch) {
+        runCatching { store.saveSketch(sketch) }
+            .onSuccess { saveError = null }
+            .onFailure { saveError = it.localizedMessage ?: "Ошибка сохранения эскиза" }
+    }
     var selectedIndex by remember { mutableIntStateOf(-1) }
     var drawingMode by remember { mutableStateOf("Line") }
     Column(Modifier.fillMaxSize().background(CadBackground).padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("FreeCAD  •  SKETCHER", color = Color.White, fontSize = 14.sp)
-            Text("XY plane", color = Color(0xFFB8C3CC), fontSize = 12.sp)
+            Text(if (saveError == null) "Saved" else "Save error", color = if (saveError == null) Color(0xFF8BCB9B) else Color(0xFFFF8A80), fontSize = 12.sp)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(onClick = { drawingMode = "Line" }, colors = ButtonDefaults.buttonColors(containerColor = if (drawingMode == "Line") CadAccent else Color(0xFF34414B))) { Text("Line") }
