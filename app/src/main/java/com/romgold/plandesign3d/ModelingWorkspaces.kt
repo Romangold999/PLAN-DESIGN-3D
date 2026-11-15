@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.platform.LocalContext
 import com.romgold.plandesign3d.data.ModelingDocumentStore
 import com.romgold.plandesign3d.domain.*
@@ -194,27 +195,54 @@ fun FreeCADWorkspace() {
     var sketch by remember(store) { mutableStateOf(store.loadSketch() ?: FreeCADSketchDocument(UUID.randomUUID().toString(), "Sketch")) }
     LaunchedEffect(sketch) { store.saveSketch(sketch) }
     var selectedIndex by remember { mutableIntStateOf(-1) }
+    var drawingMode by remember { mutableStateOf("Line") }
     Column(Modifier.fillMaxSize().background(CadBackground).padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("FreeCAD  •  SKETCHER", color = Color.White, fontSize = 14.sp)
             Text("XY plane", color = Color(0xFFB8C3CC), fontSize = 12.sp)
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button(onClick = {
-                sketch = sketch.copy(geometry = sketch.geometry + SketchGeometry.Segment(Vector3(-45.0, -25.0, 0.0), Vector3(45.0, 25.0, 0.0)))
-                selectedIndex = sketch.geometry.lastIndex
-            }, colors = ButtonDefaults.buttonColors(containerColor = CadAccent)) { Text("Line") }
-            OutlinedButton(onClick = {
-                sketch = sketch.copy(geometry = sketch.geometry + SketchGeometry.Circle(Vector3(0.0, 0.0, 0.0), 35.0))
-                selectedIndex = sketch.geometry.lastIndex
-            }) { Text("Circle") }
+            Button(onClick = { drawingMode = "Line" }, colors = ButtonDefaults.buttonColors(containerColor = if (drawingMode == "Line") CadAccent else Color(0xFF34414B))) { Text("Line") }
+            OutlinedButton(onClick = { drawingMode = "Circle" }) { Text("Circle") }
+            OutlinedButton(onClick = { drawingMode = "Select" }) { Text("Select") }
             OutlinedButton(enabled = selectedIndex in sketch.geometry.indices, onClick = {
                 sketch = sketch.copy(geometry = sketch.geometry.filterIndexed { i, _ -> i != selectedIndex }, constraints = sketch.constraints.filter { it.firstGeometry != selectedIndex && it.secondGeometry != selectedIndex }.map { c -> c.copy(firstGeometry = if (c.firstGeometry > selectedIndex) c.firstGeometry - 1 else c.firstGeometry, secondGeometry = c.secondGeometry?.let { if (it > selectedIndex) it - 1 else it }) })
                 selectedIndex = -1
             }) { Text("Delete") }
         }
         Text("Sketch geometry", color = Color(0xFFCBD4DC), fontSize = 12.sp)
-        Canvas(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF171C21), RoundedCornerShape(6.dp))) {
+        Canvas(Modifier.fillMaxWidth().weight(1f).background(Color(0xFF171C21), RoundedCornerShape(6.dp)).pointerInput(drawingMode, sketch.geometry.size) {
+            var dragStart: Offset? = null
+            var dragEnd: Offset? = null
+            detectDragGestures(
+                onDragStart = { dragStart = it; dragEnd = it },
+                onDrag = { change, _ -> dragEnd = change.position },
+                onDragEnd = {
+                    val start = dragStart
+                    val end = dragEnd
+                    if (drawingMode != "Select" && start != null && end != null) {
+                        val unit = size.minDimension / 240f
+                        val origin = Offset(size.width / 2f, size.height / 2f)
+                        val worldStart = Vector3((start.x - origin.x) / unit.toDouble(), (origin.y - start.y) / unit.toDouble(), 0.0)
+                        val worldEnd = Vector3((end.x - origin.x) / unit.toDouble(), (origin.y - end.y) / unit.toDouble(), 0.0)
+                        val created: SketchGeometry? = when (drawingMode) {
+                            "Line" -> if (worldStart != worldEnd) SketchGeometry.Segment(worldStart, worldEnd) else null
+                            "Circle" -> {
+                                val radius = kotlin.math.hypot((end.x - start.x).toDouble(), (end.y - start.y).toDouble()) / unit
+                                if (radius > 0.5) SketchGeometry.Circle(worldStart, radius) else null
+                            }
+                            else -> null
+                        }
+                        if (created != null) {
+                            sketch = sketch.copy(geometry = sketch.geometry + created)
+                            selectedIndex = sketch.geometry.lastIndex
+                        }
+                    }
+                    dragStart = null
+                    dragEnd = null
+                }
+            )
+        }) {
             val unit = size.minDimension / 240f
             val origin = Offset(size.width / 2f, size.height / 2f)
             var x = origin.x % (unit * 10f)
