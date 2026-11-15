@@ -78,15 +78,29 @@ fun BlenderWorkspace() {
                     while (gy < size.height) { drawLine(Color(0xFF3B3E44), Offset(0f, gy), Offset(size.width, gy), 1f); gy += step }
                     objects.firstOrNull { it.id == selectedId }?.let { item ->
                         val mesh = item.mesh
-                        val angle = Math.toRadians(rotation.toDouble())
+                        val viewAngle = Math.toRadians(rotation.toDouble())
+                        val objectRotation = item.transform.rotationDegrees
+                        val rx = Math.toRadians(objectRotation.x)
+                        val ry = Math.toRadians(objectRotation.y)
+                        val rz = Math.toRadians(objectRotation.z)
+                        val cx = cos(rx); val sx = sin(rx)
+                        val cy = cos(ry); val sy = sin(ry)
+                        val cz = cos(rz); val sz = sin(rz)
                         val points = mesh.vertices.map { vertex ->
-                            val localX = vertex.x + item.transform.location.x
-                            val localY = vertex.y + item.transform.location.y
-                            val localZ = vertex.z + item.transform.location.z
-                            val x = localX * cos(angle) - localZ * sin(angle)
-                            val z = localX * sin(angle) + localZ * cos(angle)
+                            val scaledX = vertex.x * item.transform.scale.x
+                            val scaledY = vertex.y * item.transform.scale.y
+                            val scaledZ = vertex.z * item.transform.scale.z
+                            val rotatedY = scaledY * cx - scaledZ * sx
+                            val rotatedZ = scaledY * sx + scaledZ * cx
+                            val rotatedX = scaledX * cy + rotatedZ * sy
+                            val depthZ = -scaledX * sy + rotatedZ * cy
+                            val objectX = rotatedX * cz - rotatedY * sz + item.transform.location.x
+                            val objectY = rotatedX * sz + rotatedY * cz + item.transform.location.y
+                            val objectZ = depthZ + item.transform.location.z
+                            val x = objectX * cos(viewAngle) - objectZ * sin(viewAngle)
+                            val z = objectX * sin(viewAngle) + objectZ * cos(viewAngle)
                             val isoX = (x - z) * 0.72
-                            val isoY = (x + z) * 0.36 - localY * 0.82
+                            val isoY = (x + z) * 0.36 - objectY * 0.82
                             Offset(size.width / 2f + isoX.toFloat() * size.minDimension * 0.23f, size.height / 2f - isoY.toFloat() * size.minDimension * 0.23f)
                         }
                         val faceColors = listOf(Color(0xFF59636F), Color(0xFF778492), Color(0xFF65717D), Color(0xFF8794A0), Color(0xFF4C5661), Color(0xFF6B7784))
@@ -124,6 +138,36 @@ fun BlenderWorkspace() {
                     }, modifier = Modifier.weight(1f)) { Text("Move +$label") }
                 }
             }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                listOf("X", "Y", "Z").forEachIndexed { axis, label ->
+                    OutlinedButton(onClick = {
+                        val current = selected.transform.rotationDegrees
+                        val next = when (axis) {
+                            0 -> current.copy(x = current.x + 15.0)
+                            1 -> current.copy(y = current.y + 15.0)
+                            else -> current.copy(z = current.z + 15.0)
+                        }
+                        val index = objects.indexOfFirst { it.id == selectedId }
+                        if (index >= 0) objects[index] = selected.copy(transform = selected.transform.copy(rotationDegrees = next))
+                    }, modifier = Modifier.weight(1f)) { Text("Rotate $label +15°") }
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                listOf("X", "Y", "Z").forEachIndexed { axis, label ->
+                    OutlinedButton(onClick = {
+                        val current = selected.transform.scale
+                        val next = when (axis) {
+                            0 -> current.copy(x = (current.x + 0.1).coerceAtMost(10.0))
+                            1 -> current.copy(y = (current.y + 0.1).coerceAtMost(10.0))
+                            else -> current.copy(z = (current.z + 0.1).coerceAtMost(10.0))
+                        }
+                        val index = objects.indexOfFirst { it.id == selectedId }
+                        if (index >= 0) objects[index] = selected.copy(transform = selected.transform.copy(scale = next))
+                    }, modifier = Modifier.weight(1f)) { Text("Scale $label +") }
+                }
+            }
+            Text("Rotation  X ${selected.transform.rotationDegrees.x.toInt()}°   Y ${selected.transform.rotationDegrees.y.toInt()}°   Z ${selected.transform.rotationDegrees.z.toInt()}°", color = Color(0xFFB8BBC0), fontSize = 11.sp)
+            Text("Scale  X ${"%.1f".format(selected.transform.scale.x)}   Y ${"%.1f".format(selected.transform.scale.y)}   Z ${"%.1f".format(selected.transform.scale.z)}", color = Color(0xFFB8BBC0), fontSize = 11.sp)
             Text("Location  X ${"%.1f".format(selected.transform.location.x)}   Y ${"%.1f".format(selected.transform.location.y)}   Z ${"%.1f".format(selected.transform.location.z)}", color = Color(0xFFB8BBC0), fontSize = 11.sp)
         } else Text("Scene is empty", color = Color(0xFFB8BBC0), fontSize = 12.sp)
     }
