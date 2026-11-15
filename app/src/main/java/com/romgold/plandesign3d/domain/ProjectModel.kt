@@ -242,6 +242,23 @@ fun findFurnitureWallClearances(
                 val doorIntervals = room.openings.filter {
                     it.wallIndex == wallIndex && it.type == OpeningType.DOOR
                 }.sortedBy { it.offsetMm }
+
+                // A furniture footprint occupying the doorway plane must not be
+                // measured against the two wall fragments beside that doorway.
+                // Door blocking is a separate check; those fragments are not the
+                // nearest wall face for an item located in the opening itself.
+                val occupiesDoorway = doorIntervals.any { door ->
+                    val doorStartX = wall.start.xMm - minX + ux * door.offsetMm
+                    val doorStartY = wall.start.yMm - minY + uy * door.offsetMm
+                    val doorEndX = wall.start.xMm - minX + ux * (door.offsetMm + door.widthMm)
+                    val doorEndY = wall.start.yMm - minY + uy * (door.offsetMm + door.widthMm)
+                    segmentRectDistance(
+                        doorStartX, doorStartY, doorEndX, doorEndY,
+                        left, top, right, bottom
+                    ) <= wall.thicknessMm / 2.0
+                }
+                if (occupiesDoorway) return@forEachIndexed
+
                 val solidRanges = mutableListOf<Pair<Double, Double>>()
                 var cursor = 0.0
                 doorIntervals.forEach { door ->
