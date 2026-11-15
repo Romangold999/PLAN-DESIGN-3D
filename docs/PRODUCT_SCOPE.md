@@ -2,39 +2,44 @@
 
 ## Non-negotiable boundaries
 
-This repository is for an Android adaptation of exactly two desktop applications:
+This repository adapts exactly two applications for Android touchscreens:
 
-1. **Blender** — 3D content creation: scene/object workflow, mesh modeling, transforms, viewport navigation, materials, lighting, cameras, rendering, sculpting, animation and node-based workflows where they can be implemented on Android.
-2. **FreeCAD** — parametric CAD: document/body workflow, sketches, geometric constraints, Part Design, Part, assemblies, technical drawings and other native workbenches as they are implemented.
+1. **Blender** — 3D content creation and modeling.
+2. **FreeCAD** — parametric CAD and technical design.
 
-The Android UI must preserve the recognizable visual language and working concepts of each original application while adapting layout, tool access and gestures for touchscreens.
+The two workspaces must retain the recognizable visual language and core concepts of their respective original applications.
 
 ## Explicit exclusions
 
-- No third application is part of the product.
+- No third application.
 - No plugins, extensions, add-ons or third-party feature packs.
-- No custom renovation, interior-design, construction-estimate, finish-catalogue, room-planning or engineering-point modules unless a feature is demonstrably part of Blender or FreeCAD itself.
-- Do not invent capabilities or label a placeholder as a working Blender/FreeCAD tool.
+- No renovation, interior-design, construction-estimate, finish-catalogue, room-planning or unrelated custom modules.
+- No invented functionality and no placeholder controls presented as completed native tools.
 
-## Current repository status (2026-11-15)
+## Current status (2026-11-15)
 
-The current Android codebase is still a room-planning prototype. Its room polygon, furniture, finishes, estimates, engineering annotations and room-specific 3D preview are not a faithful implementation of Blender or FreeCAD. The latest CI build is useful as a build-system checkpoint, not as a completed release of the agreed product.
+The old room-planning source modules, exporters, tests and room-specific 3D preview have been removed. The app now launches into two separate prototype workspaces: Blender and FreeCAD.
 
-## Migration principles
+This is **not full Blender or FreeCAD parity**. Current limitations include:
+- No native .blend or .FCStd import/export round trip.
+- No complete Blender viewport navigation, edit mode, mesh operators, materials, lighting, camera or render pipeline.
+- No FreeCAD geometric constraint solver, full Part Design/Part workbenches, assemblies or technical drawing pipeline.
+- No complete undo/redo history.
+- Device-level interaction and performance remain to be validated on the target Android device.
 
-1. Audit each existing screen, model, exporter and dependency against Blender or FreeCAD. Keep only components that directly support a verified native workflow or reusable app infrastructure.
-2. Establish separate Blender and FreeCAD workspaces. Do not merge their tool concepts into a generic custom editor.
-3. Implement real operations before presenting controls: state changes must modify the document/scene and survive save/reopen.
-4. Keep file formats and interoperability explicit. Never claim native .blend, FreeCAD .FCStd, mesh or CAD format support until round-trip tests pass.
-5. Build and run unit tests after each coherent change. A successful GitHub build is not proof of correct behavior on the user's Android device.
-6. Do not remove legacy code until its replacement is implemented and verified; do not expose legacy room-planning features as part of the agreed product.
+## Migration and implementation rules
+
+1. Keep the two applications separate in navigation, visual language and document models.
+2. Implement operations against editable scene/CAD data, not decorative controls.
+3. Verify persistence after closing and reopening documents.
+4. Add unit tests for domain operations and file-format round trips.
+5. Do not advertise a format or workbench until verified.
+6. Build debug and release APKs and test on a physical Android device.
 
 ## Release gates
 
-- Separate, recognizable Blender and FreeCAD workspaces.
-- Real editable 3D scene/model data, not only a rendered room preview.
-- Undo/redo and reliable project persistence.
-- Touch-friendly viewport navigation and selection.
-- Native workflows implemented incrementally with tests.
-- Verified import/export for every format advertised.
-- Debug and release APK builds, followed by real-device testing.
+- Distinct, recognizable Blender and FreeCAD interfaces.
+- Functional scene/sketch editing and touch navigation.
+- Reliable document persistence and undo/redo.
+- Verified import/export for each advertised format.
+- Successful CI tests, APK installation and physical-device testing.
