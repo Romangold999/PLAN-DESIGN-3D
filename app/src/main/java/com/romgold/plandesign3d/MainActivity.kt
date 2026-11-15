@@ -45,7 +45,7 @@ import java.util.UUID
 import kotlin.math.min
 
 private enum class EditorTab(val title: String) {
-    PLAN("План"), WALLS("Стены"), OPENINGS("Проёмы"), FURNITURE("Мебель"), FINISHES("Материалы"), ESTIMATE("Расчёт"), THREE_D("3D"), SURFACE("Раскладка"), ELEVATIONS("Развёртки"), ENGINEERING("Инженерия"), EXPORT("Экспорт")
+    BLENDER("Blender"), FREECAD("FreeCAD")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                 var project by remember {
                     mutableStateOf(store.loadLast() ?: ProjectDocument(UUID.randomUUID().toString(), "Мой проект", RoomPlan.rectangle(5000, 4000)))
                 }
-                var tab by remember { mutableStateOf(EditorTab.PLAN) }
+                var tab by remember { mutableStateOf(EditorTab.BLENDER) }
                 val undo = remember { mutableStateListOf<ProjectDocument>() }
                 val redo = remember { mutableStateListOf<ProjectDocument>() }
                 val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -91,7 +91,7 @@ class MainActivity : ComponentActivity() {
                             project = imported
                             undo.clear()
                             redo.clear()
-                            tab = EditorTab.PLAN
+                            tab = EditorTab.BLENDER
                         }
                     }
                 }
@@ -121,37 +121,11 @@ class MainActivity : ComponentActivity() {
                             ),
                             title = {
                                 Column {
-                                    Text("PLAN DESIGN 3D", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 1.sp)
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Box(Modifier.size(6.dp).background(if (saved) Color(0xFF69C18B) else Color(0xFFE3AE58), RoundedCornerShape(50)))
-                                        Text(project.name, fontSize = 11.sp, color = Color(0xFFB4C0C8), maxLines = 1)
-                                    }
+                                    Text("BLENDER  /  FreeCAD", fontWeight = FontWeight.Bold, fontSize = 16.sp, letterSpacing = 0.5.sp)
+                                    Text("Android modeling workspaces", fontSize = 11.sp, color = Color(0xFFB4C0C8), maxLines = 1)
                                 }
                             },
-                            actions = {
-                                Box {
-                                    TextButton(onClick = { projectMenu = true }) { Text("ФАЙЛ") }
-                                    DropdownMenu(expanded = projectMenu, onDismissRequest = { projectMenu = false }) {
-                                        DropdownMenuItem(text = { Text("＋ Новый проект") }, onClick = {
-                                            project = ProjectDocument(UUID.randomUUID().toString(), "Новый проект", RoomPlan.rectangle(5000, 4000))
-                                            undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
-                                        })
-                                        HorizontalDivider()
-                                        store.list().forEach { savedProject ->
-                                            DropdownMenuItem(text = { Text(savedProject.name) }, onClick = {
-                                                project = savedProject; undo.clear(); redo.clear(); tab = EditorTab.PLAN; projectMenu = false
-                                            })
-                                        }
-                                    }
-                                }
-                                TextButton(enabled = undo.isNotEmpty(), onClick = {
-                                    if (undo.isNotEmpty()) { redo.add(project); project = undo.removeAt(undo.lastIndex); saved = false }
-                                }) { Text("↶") }
-                                TextButton(enabled = redo.isNotEmpty(), onClick = {
-                                    if (redo.isNotEmpty()) { undo.add(project); project = redo.removeAt(redo.lastIndex); saved = false }
-                                }) { Text("↷") }
-                                TextButton(onClick = { store.save(project); saved = true }) { Text("СОХР.") }
-                            }
+                            actions = { }
                         )
                     }
                 ) { padding ->
@@ -177,30 +151,13 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                         Column(
-                            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 14.dp, vertical = 12.dp),
+                            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             when (tab) {
-                                EditorTab.PLAN -> PlanEditor(project, change)
-                                EditorTab.WALLS -> WallEditor(project, change)
-                                EditorTab.OPENINGS -> OpeningEditor(project, change)
-                                EditorTab.FURNITURE -> FurnitureEditor(project, change)
-                                EditorTab.FINISHES -> FinishEditor(project, change)
-                                EditorTab.ESTIMATE -> EstimateEditor(project, change)
-                                EditorTab.THREE_D -> Room3DView(project, Modifier.fillMaxWidth())
-                                EditorTab.SURFACE -> SurfaceLayoutEditor(project, change)
-                                EditorTab.ELEVATIONS -> WallElevationEditor(project)
-                                EditorTab.ENGINEERING -> EngineeringEditor(project, change)
-                                EditorTab.EXPORT -> ExportEditor(
-                                    project,
-                                    onSvg = { pendingExport = ProjectSvgExporter.encode(project); svgLauncher.launch(project.name + ".svg") },
-                                    onJson = { pendingExport = ProjectCodec.encode(project); jsonLauncher.launch(project.name + ".json") },
-                                    onCsv = { pendingExport = EstimateCsvExporter.encode(project); csvLauncher.launch(project.name + "-smeta.csv") },
-                                    onImport = { importLauncher.launch(arrayOf("application/json", "text/plain")) }
-                                )
+                                EditorTab.BLENDER -> BlenderWorkspace()
+                                EditorTab.FREECAD -> FreeCADWorkspace()
                             }
-                            Text(if (saved) "Автосохранение включено • офлайн" else "Есть несохранённые изменения",
-                                color = if (saved) Color(0xFF28734A) else MaterialTheme.colorScheme.primary, fontSize = 12.sp)
                         }
                     }
                 }
