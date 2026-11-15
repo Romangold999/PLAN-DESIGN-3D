@@ -48,7 +48,7 @@ fun BlenderWorkspace() {
     var saveError by remember { mutableStateOf<String?>(store.lastLoadError) }
     LaunchedEffect(objects.toList()) {
         runCatching { store.saveScene(initialScene.copy(objects = objects.toList())) }
-            .onSuccess { saveError = null }
+            .onSuccess { if (store.lastLoadError == null) saveError = null }
             .onFailure { saveError = it.localizedMessage ?: "Ошибка сохранения сцены" }
     }
     var selectedId by remember { mutableStateOf(objects.firstOrNull()?.id.orEmpty()) }
@@ -151,8 +151,7 @@ fun BlenderWorkspace() {
         }
         Text("Transform", color = Color.White, fontSize = 13.sp)
         if (selected != null) {
-            saveError?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 10.sp) }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("X", "Y", "Z").forEachIndexed { axis, label ->
                     OutlinedButton(onClick = {
                         val p = selected.transform.location
@@ -214,6 +213,7 @@ fun FreeCADWorkspace() {
             Text("FreeCAD  •  SKETCHER", color = Color.White, fontSize = 14.sp)
             Text(if (saveError == null) "Saved" else "Save error", color = if (saveError == null) Color(0xFF8BCB9B) else Color(0xFFFF8A80), fontSize = 12.sp)
         }
+        saveError?.let { Text(it, color = Color(0xFFFF8A80), fontSize = 10.sp) }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(onClick = { drawingMode = "Line" }, colors = ButtonDefaults.buttonColors(containerColor = if (drawingMode == "Line") CadAccent else Color(0xFF34414B))) { Text("Line") }
             OutlinedButton(onClick = { drawingMode = "Circle" }) { Text("Circle") }
