@@ -226,8 +226,8 @@ fun FreeCADWorkspace() {
                             val unit = minOf(size.width, size.height) / 240f
                             val origin = Offset(size.width / 2f, size.height / 2f)
                             if (drawingMode == "Select" && selectedIndex in sketch.geometry.indices) {
-                                val dx = (end.x - start.x) / unit
-                                val dy = (start.y - end.y) / unit
+                                val dx = ((end.x - start.x) / unit).toDouble()
+                                val dy = ((start.y - end.y) / unit).toDouble()
                                 val moved = when (val item = sketch.geometry[selectedIndex]) {
                                     is SketchGeometry.Segment -> item.copy(
                                         start = item.start.copy(x = item.start.x + dx, y = item.start.y + dy),
@@ -237,8 +237,8 @@ fun FreeCADWorkspace() {
                                 }
                                 sketch = sketch.copy(geometry = sketch.geometry.toMutableList().also { it[selectedIndex] = moved })
                             } else if (drawingMode != "Select") {
-                                val worldStart = Vector3((start.x - origin.x) / unit, (origin.y - start.y) / unit, 0.0)
-                                val worldEnd = Vector3((end.x - origin.x) / unit, (origin.y - end.y) / unit, 0.0)
+                                val worldStart = Vector3(((start.x - origin.x) / unit).toDouble(), ((origin.y - start.y) / unit).toDouble(), 0.0)
+                                val worldEnd = Vector3(((end.x - origin.x) / unit).toDouble(), ((origin.y - end.y) / unit).toDouble(), 0.0)
                                 val created: SketchGeometry? = when (drawingMode) {
                                     "Line" -> if (worldStart != worldEnd) SketchGeometry.Segment(worldStart, worldEnd) else null
                                     "Circle" -> {
