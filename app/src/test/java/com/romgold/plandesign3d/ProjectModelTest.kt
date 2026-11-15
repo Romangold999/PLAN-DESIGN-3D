@@ -2,6 +2,7 @@ package com.romgold.plandesign3d
 
 import com.romgold.plandesign3d.domain.*
 import com.romgold.plandesign3d.data.EstimateCsvExporter
+import com.romgold.plandesign3d.data.ProjectSvgExporter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -89,6 +90,23 @@ class ProjectModelTest {
         val result = findFurnitureWallClearances(room, listOf(item), 600)
         assertEquals(1, result.size)
         assertEquals(40, result.first().distanceMm)
+    }
+
+
+    @Test fun svgExportUsesRotatedFurnitureFootprintAndEscapesLabels() {
+        val room = RoomPlan.rectangle(5000, 4000)
+        val furniture = FurnitureItem("rotated", FurnitureKind.TABLE, 100, 200,
+            widthMm = 1200, depthMm = 600, rotationDegrees = 90)
+        val annotation = PlanAnnotation("note", AnnotationKind.SOCKET, 300, 400, "A&B <test>")
+        val project = ProjectDocument("svg-test", "SVG test", room,
+            furniture = listOf(furniture), annotations = listOf(annotation))
+
+        val svg = ProjectSvgExporter.encode(project)
+
+        assertTrue(svg.contains("""transform="translate(400.0,800.0) rotate(90)""""))
+        assertTrue(svg.contains("""x="-600.0" y="-300.0" width="1200" height="600""""))
+        assertTrue(svg.contains("A&amp;B &lt;test&gt;"))
+        assertTrue(!svg.contains("A&B <test>"))
     }
 
 }
